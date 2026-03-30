@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ФРД — календарь рабочего дня</title>
+  <style>
+    :root {
+      --bg: #eff4fb;
+      --panel: #ffffff;
+      --panel-soft: #f8fbff;
+      --line: #dbe6f1;
+      --line-strong: #c5d4e3;
+      --text: #0f172a;
+      --muted: #64748b;
+      --shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      --time-col: 84px;
+      --hours: 9;
+      --hour-height: 72px;
+      --gap: 12px;
+      --accent: #2563eb;
+      --danger: #b91c1c;
+      --radius-xl: 24px;
+      --radius-lg: 18px;
+      --radius-md: 14px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 24%),
+        linear-gradient(180deg, #eef4fb 0%, #f8fbff 100%);
+      color: var(--text);
+    }
+
+    button, select, input { font: inherit; }
+
+    .app {
+      min-height: 100vh;
+      padding: 20px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .topbar,
+    .summary-strip,
+    .board {
+      background: var(--panel);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+    }
+
+    .topbar {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .topbar-row {
+      display: grid;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .topbar-row.primary {
+      grid-template-columns: minmax(160px, 220px) minmax(280px, 1.15fr) minmax(240px, 0.85fr) minmax(320px, 1fr);
+    }
+
+    .topbar-row.secondary {
+      grid-template-columns: minmax(520px, 1fr) minmax(300px, 420px);
+      align-items: start;
+    }
+
+    .brand-block {
+      padding: 14px 16px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #fff;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .brand-kicker {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
+
+    .brand-block h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .brand-note {
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+
+    .control-group {
+      border: 1px solid #e5edf5;
+      border-radius: 20px;
+      padding: 12px;
+      background: var(--panel-soft);
+      min-height: 100%;
+    }
+
+    .group-title {
+      display: block;
+      margin-bottom: 10px;
+      padding-left: 2px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .trainer-tabs,
+    .view-tabs,
+    .nav-controls {
+      display: grid;
+      gap: 8px;
+    }
+
+    .trainer-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .view-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .nav-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .nav-stack {
+      display: grid;
+      gap: 8px;
+    }
+
+    .preset-list {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .secondary-actions {
+      display: grid;
+      grid-template-columns: minmax(140px, 1fr) auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .field-wrap {
+      display: grid;
+      gap: 8px;
+    }
+
+    .field-label {
+      display: block;
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .tab-btn,
+    .preset-btn,
+    .action-btn,
+    .nav-btn,
+    select,
+    input[type="date"] {
+      width: 100%;
+      border: 1px solid #d7e4ef;
+      background: #fff;
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      transition: 0.18s ease;
+      min-height: 46px;
+    }
+
+    .tab-btn,
+    .preset-btn,
+    .action-btn,
+    .nav-btn {
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .tab-btn:hover,
+    .preset-btn:hover,
+    .action-btn:hover,
+    .nav-btn:hover,
+    select:hover,
+    input[type="date"]:hover {
+      transform: translateY(-1px);
+      border-color: #b8cbe0;
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+    }
+
+    .tab-btn.active,
+    .preset-btn.active {
+      border-color: transparent;
+      background: #f8fbff;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16);
+    }
+
+    .preset-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      text-align: left;
+    }
+
+    .swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45);
+    }
+
+    .summary-strip {
+      padding: 14px 16px;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+    }
+
+    .summary-item,
+    .summary-total,
+    .empty-note {
+      border-radius: 16px;
+      padding: 12px 14px;
+      border: 1px solid #e7eef6;
+      background: #fff;
+      font-size: 14px;
+    }
+
+    .summary-item,
+    .summary-total {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .summary-total {
+      font-weight: 800;
+      background: #f8fbff;
+    }
+
+    .summary-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+    }
+
+    .action-btn.warn {
+      color: var(--danger);
+      background: #fff5f5;
+      border-color: #fecaca;
+      white-space: nowrap;
+    }
+
+    .board {
+      padding: 18px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .board-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .board-title {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .board-subtitle {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .week-header,
+    .day-header-row {
+      display: grid;
+      gap: var(--gap);
+      min-width: 980px;
+    }
+
+    .week-header {
+      grid-template-columns: var(--time-col) repeat(var(--cols), minmax(180px, 1fr));
+    }
+
+    .day-header-row {
+      grid-template-columns: var(--time-col) minmax(260px, 1fr);
+      min-width: 440px;
+    }
+
+    .day-header,
+    .time-head,
+    .month-weekday {
+      border-radius: 16px;
+      background: #f7faff;
+      border: 1px solid #e3edf6;
+      padding: 14px 16px;
+      font-weight: 700;
+    }
+
+    .time-head {
+      color: var(--muted);
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .day-header small {
+      display: block;
+      margin-top: 4px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .grid-wrap {
+      display: grid;
+      grid-template-columns: var(--time-col) 1fr;
+      gap: var(--gap);
+    }
+
+    .time-axis {
+      position: relative;
+      height: calc(var(--hours) * var(--hour-height));
+      border-radius: 18px;
+      background: linear-gradient(180deg, #fafcff 0%, #f4f8fc 100%);
+      border: 1px solid #e3edf6;
+    }
+
+    .time-label {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      transform: translateY(-50%);
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .days-grid {
+      display: grid;
+      gap: var(--gap);
+      min-width: 980px;
+    }
+
+    .days-grid.week {
+      grid-template-columns: repeat(var(--cols), minmax(180px, 1fr));
+    }
+
+    .days-grid.day {
+      grid-template-columns: minmax(260px, 1fr);
+      min-width: 360px;
+    }
+
+    .day-column {
+      position: relative;
+      height: calc(var(--hours) * var(--hour-height));
+      border-radius: 18px;
+      border: 1px solid #dfe9f3;
+      background:
+        repeating-linear-gradient(
+          to bottom,
+          rgba(148, 163, 184, 0.18) 0,
+          rgba(148, 163, 184, 0.18) 1px,
+          transparent 1px,
+          transparent calc(var(--hour-height) / 4)
+        ),
+        repeating-linear-gradient(
+          to bottom,
+          rgba(100, 116, 139, 0.24) 0,
+          rgba(100, 116, 139, 0.24) 1.5px,
+          transparent 1.5px,
+          transparent var(--hour-height)
+        ),
+        linear-gradient(180deg, #fcfdff 0%, #f9fbfd 100%);
+      overflow: hidden;
+      cursor: crosshair;
+    }
+
+    .day-column.weekend {
+      background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+      cursor: default;
+    }
+
+    .weekend-center {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: #64748b;
+      font-weight: 700;
+      font-size: 14px;
+      text-align: center;
+      padding: 16px;
+    }
+
+    .slot {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      border-radius: 16px;
+      padding: 10px 12px 18px;
+      color: #fff;
+      box-shadow: 0 12px 18px rgba(15, 23, 42, 0.18);
+      cursor: grab;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    .slot.dragging,
+    .slot.resizing {
+      outline: 2px solid rgba(255, 255, 255, 0.65);
+      outline-offset: -2px;
+      filter: saturate(1.08);
+    }
+
+    .slot:active { cursor: grabbing; }
+
+    .slot-title {
+      padding-right: 20px;
+      font-weight: 800;
+      font-size: 14px;
+      line-height: 1.2;
+      margin-bottom: 6px;
+    }
+
+    .slot-meta {
+      font-size: 12px;
+      opacity: 0.95;
+      font-weight: 700;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      border: none;
+      background: rgba(255, 255, 255, 0.22);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      line-height: 1;
+    }
+
+    .resize-handle {
+      position: absolute;
+      left: 50%;
+      bottom: 5px;
+      transform: translateX(-50%);
+      width: 46px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      cursor: ns-resize;
+    }
+
+    .month-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: var(--gap);
+      min-width: 980px;
+    }
+
+    .month-weekday {
+      text-align: center;
+    }
+
+    .month-cell {
+      min-height: 140px;
+      border-radius: 18px;
+      border: 1px solid #dfe9f3;
+      background: linear-gradient(180deg, #fcfdff 0%, #f9fbfd 100%);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    .month-cell:hover {
+      border-color: #bfd1e4;
+      transform: translateY(-1px);
+    }
+
+    .month-cell.outside {
+      opacity: 0.38;
+    }
+
+    .month-cell.weekend {
+      background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    }
+
+    .month-cell.active {
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16);
+      border-color: transparent;
+    }
+
+    .month-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-weight: 800;
+    }
+
+    .month-total {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .chip-list {
+      display: grid;
+      gap: 6px;
+      align-content: start;
+    }
+
+    .chip {
+      border-radius: 12px;
+      padding: 7px 9px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+
+    .brand-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .meta-pill::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: currentColor;
+      opacity: 0.9;
+    }
+
+    .meta-pill.online { color: #86efac; }
+    .meta-pill.offline { color: #fde68a; }
+    .meta-pill.error { color: #fca5a5; }
+
+    @media (max-width: 1420px) {
+      .topbar-row.primary {
+        grid-template-columns: repeat(2, minmax(280px, 1fr));
+      }
+
+      .topbar-row.secondary {
+        grid-template-columns: 1fr;
+      }
+
+      .preset-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 900px) {
+      .app { padding: 14px; }
+      .topbar-row.primary { grid-template-columns: 1fr; }
+      .trainer-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .view-tabs,
+      .nav-controls,
+      .secondary-actions,
+      .preset-list { grid-template-columns: 1fr; }
+      .board-title { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-row primary">
+        <div class="brand-block">
+          <div class="brand-kicker">Фотография рабочего дня</div>
+          <h1>ФРД</h1>
+          <div class="brand-note">Календарь тренеров</div>
+          <div class="brand-meta">
+            <span class="meta-pill offline" id="syncStatus">Локально</span>
+            <span class="meta-pill" id="boardBadge">Доска: main</span>
+          </div>
+        </div>
+
+        <section class="control-group">
+          <span class="group-title">Тренер</span>
+          <div class="trainer-tabs" id="trainerTabs"></div>
+        </section>
+
+        <section class="control-group">
+          <span class="group-title">Период</span>
+          <div class="view-tabs" id="viewTabs"></div>
+        </section>
+
+        <section class="control-group">
+          <span class="group-title">Навигация</span>
+          <div class="nav-stack">
+            <div class="nav-controls">
+              <button class="nav-btn" id="prevBtn" type="button">←</button>
+              <button class="nav-btn" id="todayBtn" type="button">Сегодня</button>
+              <button class="nav-btn" id="nextBtn" type="button">→</button>
+            </div>
+            <input type="date" id="dateInput" />
+          </div>
+        </section>
+      </div>
+
+      <div class="topbar-row secondary">
+        <section class="control-group">
+          <span class="group-title">Шаблоны</span>
+          <div class="preset-list" id="presetList"></div>
+        </section>
+
+        <section class="control-group">
+          <div class="secondary-actions">
+            <div class="field-wrap">
+              <label for="durationSelect" class="field-label">Длительность</label>
+              <select id="durationSelect">
+                <option value="30">30 минут</option>
+                <option value="45">45 минут</option>
+                <option value="60" selected>1 час</option>
+                <option value="90">1 час 30 минут</option>
+                <option value="120">2 часа</option>
+              </select>
+            </div>
+          </div>
+        </section>
+      </div>
+    </header>
+
+    <section class="summary-strip">
+      <div class="summary" id="summary"></div>
+    </section>
+
+    <main class="board">
+      <div class="board-top">
+        <div>
+          <div class="board-title" id="boardTitle"></div>
+          <div class="board-subtitle" id="boardSubtitle"></div>
+        </div>
+      </div>
+      <div id="boardContent"></div>
+    </main>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+    // Вставь сюда объект конфигурации Firebase после настройки проекта,
+    // например: window.FRD_FIREBASE_CONFIG = { apiKey: "...", authDomain: "...", projectId: "..." };
+    window.FRD_FIREBASE_CONFIG = window.FRD_FIREBASE_CONFIG || null;
+
+    const UI_STORAGE_KEY = "frd-calendar-v4-ui";
+    const SLOT_STORAGE_KEY = "frd-calendar-v4-slots";
+    const START_HOUR = 9;
+    const END_HOUR = 18;
+    const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
+    const HOUR_HEIGHT = 72;
+    const PX_PER_MINUTE = HOUR_HEIGHT / 60;
+    const SNAP = 15;
+    const WEEKDAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+    const WEEKDAY_LONG = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"];
+    const MONTH_LABELS = [
+      "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+      "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ];
+
+    const TRAINERS = [
+      { id: "valeria", name: "Валерия" },
+      { id: "arina", name: "Арина" },
+      { id: "yuliya", name: "Юлия" },
+      { id: "laura", name: "Лаура" }
+    ];
+
+    const PRESETS = [
+      { id: "training", title: "Тренинг", color: "#4f46e5" },
+      { id: "individual", title: "Индивидуальная работа", color: "#0891b2" },
+      { id: "preparation", title: "Подготовка", color: "#16a34a" },
+      { id: "suflirovanie", title: "Суфлирование", color: "#ea580c" }
+    ];
+
+    let state = loadState();
+    let interaction = null;
+    let remoteDb = null;
+    let remoteDocRef = null;
+    let remoteUnsubscribe = null;
+    let syncEnabled = false;
+    let remoteReady = false;
+
+    const trainerTabs = document.getElementById("trainerTabs");
+    const viewTabs = document.getElementById("viewTabs");
+    const presetList = document.getElementById("presetList");
+    const durationSelect = document.getElementById("durationSelect");
+    const summaryEl = document.getElementById("summary");
+    const boardTitle = document.getElementById("boardTitle");
+    const boardSubtitle = document.getElementById("boardSubtitle");
+    const boardContent = document.getElementById("boardContent");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const todayBtn = document.getElementById("todayBtn");
+    const dateInput = document.getElementById("dateInput");
+    const syncStatus = document.getElementById("syncStatus");
+    const boardBadge = document.getElementById("boardBadge");
+
+    function uid() {
+      if (window.crypto && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+      return "slot-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function snapMinutes(value) {
+      return Math.round(value / SNAP) * SNAP;
+    }
+
+    function isWeekend(date) {
+      const day = date.getDay();
+      return day === 0 || day === 6;
+    }
+
+    function toISO(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    function parseISO(iso) {
+      const [year, month, day] = iso.split("-").map(Number);
+      return new Date(year, month - 1, day, 12, 0, 0, 0);
+    }
+
+    function addDays(date, days) {
+      const copy = new Date(date);
+      copy.setDate(copy.getDate() + days);
+      return copy;
+    }
+
+    function addMonths(date, months) {
+      const copy = new Date(date);
+      copy.setMonth(copy.getMonth() + months);
+      return copy;
+    }
+
+    function startOfWeek(date) {
+      const copy = new Date(date);
+      const jsDay = copy.getDay();
+      const diff = jsDay === 0 ? -6 : 1 - jsDay;
+      copy.setDate(copy.getDate() + diff);
+      return new Date(copy.getFullYear(), copy.getMonth(), copy.getDate(), 12);
+    }
+
+    function startOfMonthGrid(date) {
+      const first = new Date(date.getFullYear(), date.getMonth(), 1, 12);
+      return startOfWeek(first);
+    }
+
+    function formatTime(minutesFromStart) {
+      const absolute = START_HOUR * 60 + minutesFromStart;
+      const h = Math.floor(absolute / 60);
+      const m = absolute % 60;
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
+
+    function formatDuration(totalMinutes) {
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      if (h && m) return `${h} ч ${m} м`;
+      if (h) return `${h} ч`;
+      return `${m} м`;
+    }
+
+    function formatDateLabel(date, short = false) {
+      const wd = short ? WEEKDAY_LABELS[getWeekdayIndex(date)] : WEEKDAY_LONG[getWeekdayIndex(date)];
+      return `${wd}, ${String(date.getDate()).padStart(2, "0")}.${String(date.getMonth() + 1).padStart(2, "0")}`;
+    }
+
+    function getWeekdayIndex(date) {
+      const js = date.getDay();
+      return js === 0 ? 6 : js - 1;
+    }
+
+    function getPresetById(id) {
+      return PRESETS.find((preset) => preset.id === id) || PRESETS[0];
+    }
+
+    function getTrainerById(id) {
+      return TRAINERS.find((trainer) => trainer.id === id) || TRAINERS[0];
+    }
+
+    function getBoardId() {
+      const params = new URLSearchParams(window.location.search);
+      const raw = params.get("board") || "main";
+      return raw.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-") || "main";
+    }
+
+    function getFallbackUiState() {
+      const today = toISO(new Date());
+      return {
+        selectedTrainerId: TRAINERS[0].id,
+        selectedPresetId: PRESETS[0].id,
+        view: "week",
+        cursorDate: today
+      };
+    }
+
+    function loadState() {
+      const fallback = getFallbackUiState();
+      let ui = fallback;
+      let slots = [];
+
+      try {
+        const rawUi = localStorage.getItem(UI_STORAGE_KEY);
+        if (rawUi) {
+          const parsed = JSON.parse(rawUi);
+          ui = {
+            selectedTrainerId: TRAINERS.some((item) => item.id === parsed.selectedTrainerId) ? parsed.selectedTrainerId : fallback.selectedTrainerId,
+            selectedPresetId: PRESETS.some((item) => item.id === parsed.selectedPresetId) ? parsed.selectedPresetId : fallback.selectedPresetId,
+            view: ["day", "week", "month"].includes(parsed.view) ? parsed.view : fallback.view,
+            cursorDate: typeof parsed.cursorDate === "string" ? parsed.cursorDate : fallback.cursorDate
+          };
+        }
+      } catch (error) {
+        ui = fallback;
+      }
+
+      try {
+        const rawSlots = localStorage.getItem(SLOT_STORAGE_KEY);
+        if (rawSlots) {
+          const parsedSlots = JSON.parse(rawSlots);
+          slots = Array.isArray(parsedSlots)
+            ? parsedSlots.filter((slot) => slot && slot.date && slot.trainerId)
+            : [];
+        }
+      } catch (error) {
+        slots = [];
+      }
+
+      return { ...ui, slots };
+    }
+
+    function saveUiState() {
+      localStorage.setItem(UI_STORAGE_KEY, JSON.stringify({
+        selectedTrainerId: state.selectedTrainerId,
+        selectedPresetId: state.selectedPresetId,
+        view: state.view,
+        cursorDate: state.cursorDate
+      }));
+    }
+
+    function saveSlotsLocal() {
+      localStorage.setItem(SLOT_STORAGE_KEY, JSON.stringify(state.slots));
+    }
+
+    function saveState() {
+      saveUiState();
+      saveSlotsLocal();
+    }
+
+    function sanitizeSlots(rawSlots) {
+      if (!Array.isArray(rawSlots)) return [];
+      return rawSlots
+        .filter((slot) => slot && typeof slot === "object" && slot.date && slot.trainerId)
+        .map((slot) => ({
+          id: typeof slot.id === "string" ? slot.id : uid(),
+          trainerId: TRAINERS.some((trainer) => trainer.id === slot.trainerId) ? slot.trainerId : TRAINERS[0].id,
+          date: slot.date,
+          startMin: clamp(Number(slot.startMin) || 0, 0, TOTAL_MINUTES - SNAP),
+          durationMin: clamp(snapMinutes(Number(slot.durationMin) || 60), SNAP, TOTAL_MINUTES),
+          presetId: PRESETS.some((preset) => preset.id === slot.presetId) ? slot.presetId : PRESETS[0].id,
+          title: typeof slot.title === "string" && slot.title.trim() ? slot.title.trim() : getPresetById(slot.presetId).title
+        }))
+        .map((slot) => ({
+          ...slot,
+          durationMin: Math.min(slot.durationMin, TOTAL_MINUTES - slot.startMin)
+        }));
+    }
+
+    function updateSyncBadge(mode, textValue) {
+      syncStatus.textContent = textValue;
+      syncStatus.className = `meta-pill ${mode}`;
+      boardBadge.textContent = `Доска: ${getBoardId()}`;
+    }
+
+    async function initRemoteSync() {
+      updateSyncBadge("offline", "Локально");
+
+      if (!window.FRD_FIREBASE_CONFIG || !window.firebase || !firebase.apps) {
+        return;
+      }
+
+      try {
+        const app = firebase.apps.length
+          ? firebase.app()
+          : firebase.initializeApp(window.FRD_FIREBASE_CONFIG);
+
+        remoteDb = firebase.firestore(app);
+        remoteDocRef = remoteDb.collection("frdBoards").doc(getBoardId());
+        syncEnabled = true;
+        updateSyncBadge("offline", "Подключение...");
+
+        remoteUnsubscribe = remoteDocRef.onSnapshot(async (doc) => {
+          const data = doc.data();
+          if (!doc.exists || !data) {
+            await remoteDocRef.set({
+              slots: state.slots,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+              version: 1
+            }, { merge: true });
+            remoteReady = true;
+            updateSyncBadge("online", "Онлайн");
+            return;
+          }
+
+          state.slots = sanitizeSlots(data.slots || []);
+          saveSlotsLocal();
+          remoteReady = true;
+          updateSyncBadge("online", "Онлайн");
+          renderAll();
+        }, (error) => {
+          console.error(error);
+          updateSyncBadge("error", "Ошибка sync");
+        });
+      } catch (error) {
+        console.error(error);
+        syncEnabled = false;
+        remoteReady = false;
+        updateSyncBadge("error", "Ошибка sync");
+      }
+    }
+
+    async function persistSlots() {
+      saveSlotsLocal();
+      if (!syncEnabled || !remoteDocRef || !remoteReady) return;
+
+      try {
+        await remoteDocRef.set({
+          slots: state.slots,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          version: 1
+        }, { merge: true });
+        updateSyncBadge("online", "Онлайн");
+      } catch (error) {
+        console.error(error);
+        updateSyncBadge("error", "Ошибка sync");
+      }
+    }
+
+    function getFilteredSlots() {
+      return state.slots.filter((slot) => slot.trainerId === state.selectedTrainerId);
+    }
+
+    function getVisibleDates() {
+      const cursor = parseISO(state.cursorDate);
+      if (state.view === "day") return [cursor];
+      if (state.view === "week") {
+        const monday = startOfWeek(cursor);
+        return Array.from({ length: 5 }, (_, index) => addDays(monday, index));
+      }
+      return [];
+    }
+
+    function getPeriodBounds() {
+      const cursor = parseISO(state.cursorDate);
+      if (state.view === "day") {
+        return { start: toISO(cursor), end: toISO(cursor) };
+      }
+      if (state.view === "week") {
+        const monday = startOfWeek(cursor);
+        const friday = addDays(monday, 4);
+        return { start: toISO(monday), end: toISO(friday) };
+      }
+      const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1, 12);
+      const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0, 12);
+      return { start: toISO(first), end: toISO(last) };
+    }
+
+    function slotInPeriod(slot) {
+      const bounds = getPeriodBounds();
+      return slot.date >= bounds.start && slot.date <= bounds.end && slot.trainerId === state.selectedTrainerId;
+    }
+
+    function renderTrainerTabs() {
+      trainerTabs.innerHTML = TRAINERS.map((trainer) => `
+        <button class="tab-btn ${trainer.id === state.selectedTrainerId ? "active" : ""}" data-trainer-id="${trainer.id}" type="button">${trainer.name}</button>
+      `).join("");
+    }
+
+    function renderViewTabs() {
+      const views = [
+        { id: "day", title: "День" },
+        { id: "week", title: "Неделя" },
+        { id: "month", title: "Месяц" }
+      ];
+      viewTabs.innerHTML = views.map((view) => `
+        <button class="tab-btn ${view.id === state.view ? "active" : ""}" data-view-id="${view.id}" type="button">${view.title}</button>
+      `).join("");
+    }
+
+    function renderPresets() {
+      presetList.innerHTML = PRESETS.map((preset) => `
+        <button class="preset-btn ${preset.id === state.selectedPresetId ? "active" : ""}" data-preset-id="${preset.id}" type="button">
+          <span class="summary-left">
+            <span class="swatch" style="background:${preset.color}"></span>
+            <span>${preset.title}</span>
+          </span>
+        </button>
+      `).join("");
+    }
+
+    function renderSummary() {
+      const periodSlots = state.slots.filter(slotInPeriod);
+      const totals = PRESETS.map((preset) => {
+        const minutes = periodSlots
+          .filter((slot) => slot.presetId === preset.id)
+          .reduce((sum, slot) => sum + slot.durationMin, 0);
+        return { ...preset, minutes };
+      });
+
+      const overall = totals.reduce((sum, item) => sum + item.minutes, 0);
+      const items = totals
+        .filter((item) => item.minutes > 0)
+        .map((item) => `
+          <div class="summary-item">
+            <div class="summary-left">
+              <span class="swatch" style="background:${item.color}"></span>
+              <span>${item.title}</span>
+            </div>
+            <strong>${formatDuration(item.minutes)}</strong>
+          </div>
+        `)
+        .join("");
+
+      summaryEl.innerHTML = `
+        ${items || '<div class="empty-note">Пусто</div>'}
+        <div class="summary-total">
+          <span>Всего</span>
+          <span>${formatDuration(overall)}</span>
+        </div>
+      `;
+    }
+
+    function renderBoardHeader() {
+      const trainer = getTrainerById(state.selectedTrainerId);
+      const cursor = parseISO(state.cursorDate);
+      boardTitle.textContent = trainer.name;
+      if (state.view === "day") {
+        boardSubtitle.textContent = formatDateLabel(cursor);
+      } else if (state.view === "week") {
+        const monday = startOfWeek(cursor);
+        const friday = addDays(monday, 4);
+        boardSubtitle.textContent = `${String(monday.getDate()).padStart(2, "0")}.${String(monday.getMonth() + 1).padStart(2, "0")} — ${String(friday.getDate()).padStart(2, "0")}.${String(friday.getMonth() + 1).padStart(2, "0")}`;
+      } else {
+        boardSubtitle.textContent = `${MONTH_LABELS[cursor.getMonth()]} ${cursor.getFullYear()}`;
+      }
+      dateInput.value = state.cursorDate;
+    }
+
+    function renderTimeAxis() {
+      const labels = [];
+      for (let i = 0; i <= END_HOUR - START_HOUR; i += 1) {
+        const top = i * HOUR_HEIGHT;
+        labels.push(`<div class="time-label" style="top:${top}px">${String(START_HOUR + i).padStart(2, "0")}:00</div>`);
+      }
+      return `<div class="time-axis">${labels.join("")}</div>`;
+    }
+
+    function renderSlot(slot) {
+      const preset = getPresetById(slot.presetId);
+      const top = slot.startMin * PX_PER_MINUTE;
+      const height = slot.durationMin * PX_PER_MINUTE;
+      const activeClass = interaction && interaction.slotId === slot.id ? (interaction.mode === "drag" ? "dragging" : "resizing") : "";
+      return `
+        <div
+          class="slot ${activeClass}"
+          data-id="${slot.id}"
+          style="top:${top}px;height:${height}px;background:${preset.color};"
+          title="${preset.title}"
+        >
+          <button class="delete-btn" type="button">×</button>
+          <div class="slot-title">${slot.title}</div>
+          <div class="slot-meta">${formatTime(slot.startMin)}–${formatTime(slot.startMin + slot.durationMin)}</div>
+          <div class="resize-handle"></div>
+        </div>
+      `;
+    }
+
+    function renderWeekOrDay() {
+      const dates = getVisibleDates();
+      const isDay = state.view === "day";
+      document.documentElement.style.setProperty("--cols", String(dates.length));
+
+      const headerClass = isDay ? "day-header-row" : "week-header";
+      const daysClass = isDay ? "days-grid day" : "days-grid week";
+
+      const headers = dates.map((date) => {
+        const weekend = isWeekend(date);
+        return `<div class="day-header">${isDay ? formatDateLabel(date) : WEEKDAY_LONG[getWeekdayIndex(date)]}<small>${weekend ? "выходной" : String(date.getDate()).padStart(2, "0") + "." + String(date.getMonth() + 1).padStart(2, "0")}</small></div>`;
+      }).join("");
+
+      const columns = dates.map((date) => {
+        const iso = toISO(date);
+        const weekend = isWeekend(date);
+        const daySlots = getFilteredSlots()
+          .filter((slot) => slot.date === iso)
+          .sort((a, b) => a.startMin - b.startMin);
+
+        return `
+          <div class="day-column ${weekend ? "weekend" : ""}" data-date="${iso}" aria-label="${formatDateLabel(date)}">
+            ${weekend ? '<div class="weekend-center">Выходной</div>' : daySlots.map(renderSlot).join("")}
+          </div>
+        `;
+      }).join("");
+
+      boardContent.innerHTML = `
+        <div class="${headerClass}">
+          <div class="time-head">Время</div>
+          ${headers}
+        </div>
+        <div class="grid-wrap">
+          ${renderTimeAxis()}
+          <div class="${daysClass}" id="daysGrid">${columns}</div>
+        </div>
+      `;
+    }
+
+    function renderMonth() {
+      const cursor = parseISO(state.cursorDate);
+      const start = startOfMonthGrid(cursor);
+      const days = Array.from({ length: 42 }, (_, index) => addDays(start, index));
+      const trainerSlots = getFilteredSlots();
+      boardContent.innerHTML = `
+        <div class="month-grid">
+          ${WEEKDAY_LABELS.map((label) => `<div class="month-weekday">${label}</div>`).join("")}
+          ${days.map((date) => {
+            const iso = toISO(date);
+            const isCurrentMonth = date.getMonth() === cursor.getMonth();
+            const weekend = isWeekend(date);
+            const daySlots = trainerSlots
+              .filter((slot) => slot.date === iso)
+              .sort((a, b) => a.startMin - b.startMin);
+            const total = daySlots.reduce((sum, slot) => sum + slot.durationMin, 0);
+            return `
+              <div class="month-cell ${isCurrentMonth ? "" : "outside"} ${weekend ? "weekend" : ""} ${iso === state.cursorDate ? "active" : ""}" data-month-date="${iso}">
+                <div class="month-top">
+                  <span>${date.getDate()}</span>
+                  <span class="month-total">${total ? formatDuration(total) : ""}</span>
+                </div>
+                <div class="chip-list">
+                  ${daySlots.slice(0, 5).map((slot) => {
+                    const preset = getPresetById(slot.presetId);
+                    return `<div class="chip" style="background:${preset.color}">${formatTime(slot.startMin)} ${slot.title}</div>`;
+                  }).join("")}
+                  ${daySlots.length > 5 ? `<div class="month-total">ещё ${daySlots.length - 5}</div>` : ""}
+                  ${!daySlots.length && weekend ? '<div class="month-total">выходной</div>' : ""}
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function renderBoard() {
+      renderBoardHeader();
+      if (state.view === "month") renderMonth();
+      else renderWeekOrDay();
+    }
+
+    function renderAll() {
+      renderTrainerTabs();
+      renderViewTabs();
+      renderPresets();
+      renderSummary();
+      renderBoard();
+    }
+
+    function addSlot(dateIso, startMin, durationMin, presetId) {
+      const date = parseISO(dateIso);
+      if (isWeekend(date)) return;
+      const preset = getPresetById(presetId);
+      state.slots.push({
+        id: uid(),
+        trainerId: state.selectedTrainerId,
+        date: dateIso,
+        startMin,
+        durationMin,
+        presetId: preset.id,
+        title: preset.title
+      });
+      persistSlots();
+      renderAll();
+    }
+
+    function getSlotById(id) {
+      return state.slots.find((slot) => slot.id === id);
+    }
+
+    function removeSlot(id) {
+      state.slots = state.slots.filter((slot) => slot.id !== id);
+      persistSlots();
+      renderAll();
+    }
+
+    function getVisibleColumnElements() {
+      return Array.from(document.querySelectorAll(".day-column[data-date]"));
+    }
+
+    function getNearestVisibleDate(clientX) {
+      const columns = getVisibleColumnElements().filter((col) => !col.classList.contains("weekend"));
+      if (!columns.length) return null;
+      let nearest = columns[0];
+      let bestDistance = Infinity;
+      columns.forEach((column) => {
+        const rect = column.getBoundingClientRect();
+        const center = rect.left + rect.width / 2;
+        const distance = Math.abs(clientX - center);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          nearest = column;
+        }
+      });
+      return nearest.dataset.date;
+    }
+
+    function updateCursorByStep(step) {
+      const cursor = parseISO(state.cursorDate);
+      let next;
+      if (state.view === "day") next = addDays(cursor, step);
+      else if (state.view === "week") next = addDays(cursor, step * 7);
+      else next = addMonths(cursor, step);
+      state.cursorDate = toISO(next);
+      saveUiState();
+      renderAll();
+    }
+
+    trainerTabs.addEventListener("click", (event) => {
+      const button = event.target.closest(".tab-btn[data-trainer-id]");
+      if (!button) return;
+      state.selectedTrainerId = button.dataset.trainerId;
+      saveUiState();
+      renderAll();
+    });
+
+    viewTabs.addEventListener("click", (event) => {
+      const button = event.target.closest(".tab-btn[data-view-id]");
+      if (!button) return;
+      state.view = button.dataset.viewId;
+      saveUiState();
+      renderAll();
+    });
+
+    presetList.addEventListener("click", (event) => {
+      const button = event.target.closest(".preset-btn");
+      if (!button) return;
+      state.selectedPresetId = button.dataset.presetId;
+      saveUiState();
+      renderAll();
+    });
+
+    prevBtn.addEventListener("click", () => updateCursorByStep(-1));
+    nextBtn.addEventListener("click", () => updateCursorByStep(1));
+    todayBtn.addEventListener("click", () => {
+      state.cursorDate = toISO(new Date());
+      saveUiState();
+      renderAll();
+    });
+
+    dateInput.addEventListener("change", () => {
+      if (!dateInput.value) return;
+      state.cursorDate = dateInput.value;
+      saveUiState();
+      renderAll();
+    });
+
+    document.addEventListener("click", (event) => {
+      const deleteBtn = event.target.closest(".delete-btn");
+      if (deleteBtn) {
+        const slotEl = deleteBtn.closest(".slot");
+        if (slotEl) removeSlot(slotEl.dataset.id);
+        return;
+      }
+
+      if (state.view === "month") {
+        const monthCell = event.target.closest(".month-cell[data-month-date]");
+        if (!monthCell) return;
+        state.cursorDate = monthCell.dataset.monthDate;
+        state.view = "day";
+        saveUiState();
+        renderAll();
+        return;
+      }
+
+      if (event.target.closest(".slot")) return;
+      const column = event.target.closest(".day-column[data-date]");
+      if (!column || column.classList.contains("weekend")) return;
+      const rect = column.getBoundingClientRect();
+      const durationMin = Number(durationSelect.value);
+      const y = clamp(event.clientY - rect.top, 0, rect.height);
+      const startMin = clamp(snapMinutes(y / PX_PER_MINUTE), 0, TOTAL_MINUTES - durationMin);
+      addSlot(column.dataset.date, startMin, durationMin, state.selectedPresetId);
+    });
+
+    document.addEventListener("mousedown", (event) => {
+      if (state.view === "month") return;
+      if (event.target.closest(".delete-btn")) return;
+      const resizeHandle = event.target.closest(".resize-handle");
+      const slotEl = event.target.closest(".slot");
+      if (!slotEl) return;
+      const slot = getSlotById(slotEl.dataset.id);
+      if (!slot) return;
+      interaction = {
+        slotId: slot.id,
+        mode: resizeHandle ? "resize" : "drag",
+        startX: event.clientX,
+        startY: event.clientY,
+        originalDate: slot.date,
+        originalStart: slot.startMin,
+        originalDuration: slot.durationMin
+      };
+      document.body.style.cursor = resizeHandle ? "ns-resize" : "grabbing";
+      event.preventDefault();
+      renderBoard();
+    });
+
+    document.addEventListener("mousemove", (event) => {
+      if (!interaction || state.view === "month") return;
+      const slot = getSlotById(interaction.slotId);
+      if (!slot) return;
+      const deltaY = event.clientY - interaction.startY;
+      const deltaMinutes = snapMinutes(deltaY / PX_PER_MINUTE);
+
+      if (interaction.mode === "drag") {
+        const nextDate = getNearestVisibleDate(event.clientX) || interaction.originalDate;
+        const nextStart = clamp(
+          interaction.originalStart + deltaMinutes,
+          0,
+          TOTAL_MINUTES - interaction.originalDuration
+        );
+        state.slots = state.slots.map((item) => item.id === interaction.slotId
+          ? { ...item, date: nextDate, startMin: nextStart }
+          : item);
+      } else {
+        const nextDuration = clamp(
+          interaction.originalDuration + deltaMinutes,
+          SNAP,
+          TOTAL_MINUTES - interaction.originalStart
+        );
+        state.slots = state.slots.map((item) => item.id === interaction.slotId
+          ? { ...item, durationMin: nextDuration }
+          : item);
+      }
+
+      renderBoard();
+      renderSummary();
+    });
+
+    document.addEventListener("mouseup", () => {
+      if (!interaction) return;
+      interaction = null;
+      document.body.style.cursor = "default";
+      persistSlots();
+      renderAll();
+    });
+
+    renderAll();
+    initRemoteSync();
+  </script>
+</body>
+</html>
