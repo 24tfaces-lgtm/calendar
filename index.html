@@ -1,4 +1,6 @@
 
+
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -404,7 +406,7 @@
           transparent var(--hour-height)
         ),
         linear-gradient(180deg, #fcfdff 0%, #f9fbfd 100%);
-      overflow: hidden;
+      overflow: visible;
       cursor: crosshair;
     }
 
@@ -596,6 +598,367 @@
     .meta-pill.offline { color: #fde68a; }
     .meta-pill.error { color: #fca5a5; }
 
+    
+
+    .topbar-row.secondary {
+      grid-template-columns: 1fr;
+    }
+
+    .presets-wide {
+      min-height: auto;
+    }
+
+    .preset-list {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .slot {
+      right: auto;
+      padding-right: 42px;
+      transition: box-shadow 0.16s ease, transform 0.16s ease;
+    }
+
+    .slot:hover {
+      box-shadow: 0 16px 24px rgba(15, 23, 42, 0.22);
+    }
+
+    .slot.compact {
+      padding: 8px 36px 12px 10px;
+    }
+
+    .slot.compact .slot-title {
+      font-size: 13px;
+      margin-bottom: 3px;
+    }
+
+    .slot.compact .slot-meta {
+      font-size: 11px;
+    }
+
+    .slot-title {
+      padding-right: 0;
+      cursor: text;
+      word-break: break-word;
+    }
+
+    .slot-title-input {
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      padding: 3px 6px;
+      font: inherit;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .slot-title-input:focus {
+      outline: 2px solid rgba(255, 255, 255, 0.7);
+      box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
+    }
+
+    .slot-note,
+    .slot-participants {
+      display: block;
+      margin-top: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      opacity: 0.92;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .slot-participants {
+      opacity: 0.96;
+    }
+
+
+    .delete-btn {
+      width: 28px;
+      height: 28px;
+      top: 8px;
+      right: 8px;
+      background: rgba(255, 255, 255, 0.22);
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .delete-btn:hover {
+      background: rgba(255, 255, 255, 0.32);
+    }
+
+    .slot-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .participant-toggle-btn {
+      border: none;
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      min-height: 28px;
+    }
+
+    .participant-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.28);
+    }
+
+    .participant-viewer-list {
+      display: grid;
+      gap: 10px;
+      max-height: 320px;
+      overflow: auto;
+    }
+
+    .participant-viewer-empty {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px 0;
+    }
+
+    .participant-viewer-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: #f8fbff;
+      border: 1px solid #e5edf5;
+    }
+
+    .participant-viewer-name {
+      font-size: 14px;
+      font-weight: 700;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .attend-btn {
+      border: 1px solid #d7e4ef;
+      background: #fff;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      min-height: 32px;
+    }
+
+    .attend-btn.active-yes {
+      background: #dcfce7;
+      border-color: #86efac;
+      color: #166534;
+    }
+
+    .attend-btn.active-no {
+      background: #fee2e2;
+      border-color: #fca5a5;
+      color: #991b1b;
+    }
+
+    .viewer-close-wrap {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .viewer-modal {
+      width: min(520px, 100%);
+    }
+
+    .participants-section-hidden {
+      display: none !important;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.34);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 1000;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal {
+      width: min(760px, 100%);
+      max-height: min(90vh, 920px);
+      overflow: auto;
+      background: #fff;
+      border-radius: 26px;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+      padding: 22px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .modal-head h3 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .modal-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .modal-grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .modal-grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .modal-field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .modal-field label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .modal-field input,
+    .modal-field select,
+    .modal-field textarea,
+    .participant-input {
+      border: 1px solid #d7e4ef;
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: #fff;
+      font: inherit;
+      width: 100%;
+    }
+
+    .modal-field textarea {
+      min-height: 92px;
+      resize: vertical;
+    }
+
+    .participant-wrap {
+      display: grid;
+      gap: 10px;
+      border: 1px solid #e4edf6;
+      border-radius: 18px;
+      padding: 14px;
+      background: #fbfdff;
+    }
+
+    .participant-controls {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 34px;
+    }
+
+    .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: #eef4fb;
+      border: 1px solid #d9e5f2;
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .tag-remove {
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      border: none;
+      background: #d7e4ef;
+      color: #334155;
+      cursor: pointer;
+      line-height: 1;
+      font-weight: 800;
+    }
+
+    .tag-empty {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .modal-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .modal-actions-right {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ghost-btn,
+    .solid-btn {
+      border-radius: 14px;
+      padding: 12px 16px;
+      border: 1px solid #d7e4ef;
+      background: #fff;
+      cursor: pointer;
+      font-weight: 800;
+      font: inherit;
+    }
+
+    .ghost-btn.warn {
+      color: #b91c1c;
+      background: #fff5f5;
+      border-color: #fecaca;
+    }
+
+    .solid-btn {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+
     @media (max-width: 1420px) {
       .topbar-row.primary {
         grid-template-columns: repeat(2, minmax(280px, 1fr));
@@ -659,25 +1022,10 @@
         </section>
       </div>
 
-      <div class="topbar-row secondary">
-        <section class="control-group">
+            <div class="topbar-row secondary">
+        <section class="control-group presets-wide">
           <span class="group-title">Шаблоны</span>
           <div class="preset-list" id="presetList"></div>
-        </section>
-
-        <section class="control-group">
-          <div class="secondary-actions">
-            <div class="field-wrap">
-              <label for="durationSelect" class="field-label">Длительность</label>
-              <select id="durationSelect">
-                <option value="30">30 минут</option>
-                <option value="45">45 минут</option>
-                <option value="60" selected>1 час</option>
-                <option value="90">1 час 30 минут</option>
-                <option value="120">2 часа</option>
-              </select>
-            </div>
-          </div>
         </section>
       </div>
     </header>
@@ -697,9 +1045,83 @@
     </main>
   </div>
 
+
+
+  <div class="modal-backdrop" id="editorModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalHeading">
+      <div class="modal-head">
+        <h3 id="modalHeading">Карточка</h3>
+      </div>
+
+      <div class="modal-grid two">
+        <div class="modal-field">
+          <label for="modalPreset">Тип</label>
+          <select id="modalPreset"></select>
+        </div>
+        <div class="modal-field">
+          <label for="modalTitle">Название</label>
+          <input id="modalTitle" type="text" placeholder="Введите название" />
+        </div>
+      </div>
+
+      <div class="modal-grid three">
+        <div class="modal-field">
+          <label for="modalDate">Дата</label>
+          <input id="modalDate" type="date" />
+        </div>
+        <div class="modal-field">
+          <label for="modalStart">Начало</label>
+          <input id="modalStart" type="time" step="900" min="09:00" max="18:00" />
+        </div>
+        <div class="modal-field">
+          <label for="modalDuration">Длительность, минут</label>
+          <input id="modalDuration" type="number" step="15" min="15" max="540" />
+        </div>
+      </div>
+
+      <div class="participant-wrap participants-section-hidden" id="participantsSection">
+        <div class="modal-field">
+          <label>Участники</label>
+          <div class="tag-list" id="participantTags"></div>
+        </div>
+        <div class="participant-controls">
+          <input class="participant-input" id="participantInput" type="text" placeholder="Добавить участника" />
+          <button class="ghost-btn" id="participantAddBtn" type="button">Добавить</button>
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label for="modalComment">Комментарий</label>
+        <textarea id="modalComment" placeholder="Комментарий"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="ghost-btn warn" id="modalDeleteBtn" type="button">Удалить</button>
+        <div class="modal-actions-right">
+          <button class="ghost-btn" id="modalCloseBtn" type="button">Закрыть</button>
+          <button class="solid-btn" id="modalSaveBtn" type="button">Сохранить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="participantsViewerModal" aria-hidden="true">
+    <div class="modal viewer-modal" role="dialog" aria-modal="true" aria-labelledby="participantsViewerHeading">
+      <div class="modal-head">
+        <h3 id="participantsViewerHeading">Участники</h3>
+      </div>
+      <div class="participant-viewer-list" id="participantsViewerList"></div>
+      <div class="viewer-close-wrap">
+        <button class="ghost-btn" id="participantsViewerCloseBtn" type="button">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+
+  
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>
+  <script>
     window.FRD_FIREBASE_CONFIG = {
       apiKey: "AIzaSyDMTF5bL-Y38gH8GZ57mLudwCwUO-EoLS0",
       authDomain: "calendar-17863.firebaseapp.com",
@@ -710,8 +1132,8 @@
       measurementId: "G-WXV3QGRTPC"
     };
 
-    const UI_STORAGE_KEY = "frd-calendar-v4-ui";
-    const SLOT_STORAGE_KEY = "frd-calendar-v4-slots";
+    const UI_STORAGE_KEY = "frd-calendar-v6-ui";
+    const SLOT_STORAGE_KEY = "frd-calendar-v6-slots";
     const START_HOUR = 9;
     const END_HOUR = 18;
     const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
@@ -733,24 +1155,31 @@
     ];
 
     const PRESETS = [
-      { id: "training", title: "Тренинг", color: "#4f46e5" },
-      { id: "individual", title: "Индивидуальная работа", color: "#0891b2" },
-      { id: "preparation", title: "Подготовка", color: "#16a34a" },
-      { id: "suflirovanie", title: "Суфлирование", color: "#ea580c" }
+      { id: "training", title: "Тренинг", color: "#4f46e5", defaultDuration: 60, participants: true },
+      { id: "individual", title: "Индивидуальная работа", color: "#0891b2", defaultDuration: 60, participants: true },
+      { id: "preparation", title: "Подготовка", color: "#16a34a", defaultDuration: 60, participants: false },
+      { id: "suflirovanie", title: "Суфлирование", color: "#ea580c", defaultDuration: 30, participants: true },
+      { id: "vacation", title: "Отпуск", color: "#64748b", defaultDuration: TOTAL_MINUTES, participants: false }
     ];
 
     let state = loadState();
     let interaction = null;
+    let participantsViewerState = { open: false, slotId: null };
     let remoteDb = null;
     let remoteDocRef = null;
     let remoteUnsubscribe = null;
     let syncEnabled = false;
     let remoteReady = false;
+    let modalState = {
+      open: false,
+      mode: "new",
+      slotId: null,
+      participants: []
+    };
 
     const trainerTabs = document.getElementById("trainerTabs");
     const viewTabs = document.getElementById("viewTabs");
     const presetList = document.getElementById("presetList");
-    const durationSelect = document.getElementById("durationSelect");
     const summaryEl = document.getElementById("summary");
     const boardTitle = document.getElementById("boardTitle");
     const boardSubtitle = document.getElementById("boardSubtitle");
@@ -761,6 +1190,25 @@
     const dateInput = document.getElementById("dateInput");
     const syncStatus = document.getElementById("syncStatus");
     const boardBadge = document.getElementById("boardBadge");
+    const editorModal = document.getElementById("editorModal");
+    const participantsViewerModal = document.getElementById("participantsViewerModal");
+    const participantsViewerHeading = document.getElementById("participantsViewerHeading");
+    const participantsViewerList = document.getElementById("participantsViewerList");
+    const participantsViewerCloseBtn = document.getElementById("participantsViewerCloseBtn");
+    const modalHeading = document.getElementById("modalHeading");
+    const modalPreset = document.getElementById("modalPreset");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalDate = document.getElementById("modalDate");
+    const modalStart = document.getElementById("modalStart");
+    const modalDuration = document.getElementById("modalDuration");
+    const modalComment = document.getElementById("modalComment");
+    const participantsSection = document.getElementById("participantsSection");
+    const participantTags = document.getElementById("participantTags");
+    const participantInput = document.getElementById("participantInput");
+    const participantAddBtn = document.getElementById("participantAddBtn");
+    const modalDeleteBtn = document.getElementById("modalDeleteBtn");
+    const modalCloseBtn = document.getElementById("modalCloseBtn");
+    const modalSaveBtn = document.getElementById("modalSaveBtn");
 
     function uid() {
       if (window.crypto && typeof crypto.randomUUID === "function") return crypto.randomUUID();
@@ -788,7 +1236,8 @@
     }
 
     function parseISO(iso) {
-      const [year, month, day] = iso.split("-").map(Number);
+      const [year, month, day] = String(iso || "").split("-").map(Number);
+      if (!year || !month || !day) return null;
       return new Date(year, month - 1, day, 12, 0, 0, 0);
     }
 
@@ -824,6 +1273,12 @@
       return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
     }
 
+    function parseTime(text) {
+      const [h, m] = String(text || "").split(":").map(Number);
+      if (Number.isNaN(h) || Number.isNaN(m)) return START_HOUR * 60;
+      return h * 60 + m;
+    }
+
     function formatDuration(totalMinutes) {
       const h = Math.floor(totalMinutes / 60);
       const m = totalMinutes % 60;
@@ -848,6 +1303,53 @@
 
     function getTrainerById(id) {
       return TRAINERS.find((trainer) => trainer.id === id) || TRAINERS[0];
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function normalizeParticipant(item) {
+      if (typeof item === "string") {
+        const name = item.trim();
+        return name ? { name, attended: null } : null;
+      }
+      if (!item || typeof item !== "object") return null;
+      const name = String(item.name || item.title || "").trim();
+      if (!name) return null;
+      const attended = item.attended === true ? true : item.attended === false ? false : null;
+      return { name, attended };
+    }
+
+
+    function renderParticipantsViewer(slot) {
+      const preset = getPresetById(slot.presetId);
+      participantsViewerHeading.textContent = `${slot.title} · Участники`;
+      const participants = Array.isArray(slot.participants) ? slot.participants : [];
+      participantsViewerList.innerHTML = participants.length
+        ? participants.map((participant, index) => `
+            <div class="participant-viewer-row">
+              <div class="participant-viewer-name">${escapeHtml(participant.name)}</div>
+              <button class="attend-btn ${participant.attended === true ? "active-yes" : ""}" type="button" data-attend="yes" data-slot-id="${slot.id}" data-index="${index}">Был</button>
+              <button class="attend-btn ${participant.attended === false ? "active-no" : ""}" type="button" data-attend="no" data-slot-id="${slot.id}" data-index="${index}">Не был</button>
+            </div>
+          `).join("")
+        : '<div class="participant-viewer-empty">Участники не добавлены</div>';
+      participantsViewerModal.classList.add("open");
+      participantsViewerModal.setAttribute("aria-hidden", "false");
+      participantsViewerState = { open: true, slotId: slot.id };
+    }
+
+    function closeParticipantsViewer() {
+      participantsViewerState = { open: false, slotId: null };
+      participantsViewerModal.classList.remove("open");
+      participantsViewerModal.setAttribute("aria-hidden", "true");
+      participantsViewerList.innerHTML = "";
     }
 
     function getBoardId() {
@@ -890,9 +1392,7 @@
         const rawSlots = localStorage.getItem(SLOT_STORAGE_KEY);
         if (rawSlots) {
           const parsedSlots = JSON.parse(rawSlots);
-          slots = Array.isArray(parsedSlots)
-            ? parsedSlots.filter((slot) => slot && slot.date && slot.trainerId)
-            : [];
+          slots = sanitizeSlots(parsedSlots);
         }
       } catch (error) {
         slots = [];
@@ -914,28 +1414,30 @@
       localStorage.setItem(SLOT_STORAGE_KEY, JSON.stringify(state.slots));
     }
 
-    function saveState() {
-      saveUiState();
-      saveSlotsLocal();
-    }
-
     function sanitizeSlots(rawSlots) {
       if (!Array.isArray(rawSlots)) return [];
       return rawSlots
         .filter((slot) => slot && typeof slot === "object" && slot.date && slot.trainerId)
-        .map((slot) => ({
-          id: typeof slot.id === "string" ? slot.id : uid(),
-          trainerId: TRAINERS.some((trainer) => trainer.id === slot.trainerId) ? slot.trainerId : TRAINERS[0].id,
-          date: slot.date,
-          startMin: clamp(Number(slot.startMin) || 0, 0, TOTAL_MINUTES - SNAP),
-          durationMin: clamp(snapMinutes(Number(slot.durationMin) || 60), SNAP, TOTAL_MINUTES),
-          presetId: PRESETS.some((preset) => preset.id === slot.presetId) ? slot.presetId : PRESETS[0].id,
-          title: typeof slot.title === "string" && slot.title.trim() ? slot.title.trim() : getPresetById(slot.presetId).title
-        }))
-        .map((slot) => ({
-          ...slot,
-          durationMin: Math.min(slot.durationMin, TOTAL_MINUTES - slot.startMin)
-        }));
+        .map((slot) => {
+          const preset = getPresetById(slot.presetId);
+          const startMin = clamp(snapMinutes(Number(slot.startMin) || 0), 0, TOTAL_MINUTES - SNAP);
+          const durationMin = clamp(snapMinutes(Number(slot.durationMin) || preset.defaultDuration || 60), SNAP, TOTAL_MINUTES - startMin);
+          const participants = Array.isArray(slot.participants)
+            ? slot.participants.map(normalizeParticipant).filter(Boolean)
+            : [];
+          return {
+            id: typeof slot.id === "string" ? slot.id : uid(),
+            trainerId: TRAINERS.some((trainer) => trainer.id === slot.trainerId) ? slot.trainerId : TRAINERS[0].id,
+            date: typeof slot.date === "string" ? slot.date : toISO(new Date()),
+            startMin,
+            durationMin,
+            presetId: preset.id,
+            title: typeof slot.title === "string" && slot.title.trim() ? slot.title.trim() : preset.title,
+            comment: typeof slot.comment === "string" ? slot.comment : "",
+            participants: preset.participants ? participants : []
+          };
+        })
+        .sort((a, b) => `${a.date}${String(a.startMin).padStart(4, "0")}${a.id}`.localeCompare(`${b.date}${String(b.startMin).padStart(4, "0")}${b.id}`));
     }
 
     function updateSyncBadge(mode, textValue) {
@@ -946,16 +1448,9 @@
 
     async function initRemoteSync() {
       updateSyncBadge("offline", "Локально");
-
-      if (!window.FRD_FIREBASE_CONFIG || !window.firebase || !firebase.apps) {
-        return;
-      }
-
+      if (!window.FRD_FIREBASE_CONFIG || !window.firebase || !firebase.apps) return;
       try {
-        const app = firebase.apps.length
-          ? firebase.app()
-          : firebase.initializeApp(window.FRD_FIREBASE_CONFIG);
-
+        const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(window.FRD_FIREBASE_CONFIG);
         remoteDb = firebase.firestore(app);
         remoteDocRef = remoteDb.collection("frdBoards").doc(getBoardId());
         syncEnabled = true;
@@ -968,13 +1463,12 @@
               slots: state.slots,
               createdAt: firebase.firestore.FieldValue.serverTimestamp(),
               updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-              version: 1
+              version: 2
             }, { merge: true });
             remoteReady = true;
             updateSyncBadge("online", "Онлайн");
             return;
           }
-
           state.slots = sanitizeSlots(data.slots || []);
           saveSlotsLocal();
           remoteReady = true;
@@ -995,12 +1489,11 @@
     async function persistSlots() {
       saveSlotsLocal();
       if (!syncEnabled || !remoteDocRef || !remoteReady) return;
-
       try {
         await remoteDocRef.set({
           slots: state.slots,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          version: 1
+          version: 2
         }, { merge: true });
         updateSyncBadge("online", "Онлайн");
       } catch (error) {
@@ -1014,7 +1507,7 @@
     }
 
     function getVisibleDates() {
-      const cursor = parseISO(state.cursorDate);
+      const cursor = parseISO(state.cursorDate) || new Date();
       if (state.view === "day") return [cursor];
       if (state.view === "week") {
         const monday = startOfWeek(cursor);
@@ -1024,7 +1517,7 @@
     }
 
     function getPeriodBounds() {
-      const cursor = parseISO(state.cursorDate);
+      const cursor = parseISO(state.cursorDate) || new Date();
       if (state.view === "day") {
         return { start: toISO(cursor), end: toISO(cursor) };
       }
@@ -1069,6 +1562,7 @@
           </span>
         </button>
       `).join("");
+      modalPreset.innerHTML = PRESETS.map((preset) => `<option value="${preset.id}">${preset.title}</option>`).join("");
     }
 
     function renderSummary() {
@@ -1105,7 +1599,7 @@
 
     function renderBoardHeader() {
       const trainer = getTrainerById(state.selectedTrainerId);
-      const cursor = parseISO(state.cursorDate);
+      const cursor = parseISO(state.cursorDate) || new Date();
       boardTitle.textContent = trainer.name;
       if (state.view === "day") {
         boardSubtitle.textContent = formatDateLabel(cursor);
@@ -1128,21 +1622,80 @@
       return `<div class="time-axis">${labels.join("")}</div>`;
     }
 
-    function renderSlot(slot) {
+    function buildDayLayouts(slots) {
+      const normalized = slots
+        .map((slot) => ({ slot, startMin: slot.startMin, endMin: slot.startMin + slot.durationMin }))
+        .sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin || a.slot.id.localeCompare(b.slot.id));
+      const layouts = new Map();
+      let group = [];
+      let groupEnd = -Infinity;
+
+      function flushGroup() {
+        if (!group.length) return;
+        const columnEnds = [];
+        const assigned = [];
+        let maxColumns = 1;
+
+        group.forEach((item) => {
+          let columnIndex = columnEnds.findIndex((end) => end <= item.startMin);
+          if (columnIndex === -1) {
+            columnIndex = columnEnds.length;
+            columnEnds.push(item.endMin);
+          } else {
+            columnEnds[columnIndex] = item.endMin;
+          }
+          maxColumns = Math.max(maxColumns, columnEnds.length);
+          assigned.push({ item, columnIndex });
+        });
+
+        assigned.forEach(({ item, columnIndex }) => {
+          layouts.set(item.slot.id, {
+            columnIndex,
+            columns: maxColumns,
+            startMin: item.startMin,
+            endMin: item.endMin
+          });
+        });
+
+        group = [];
+        groupEnd = -Infinity;
+      }
+
+      normalized.forEach((item) => {
+        if (!group.length || item.startMin < groupEnd) {
+          group.push(item);
+          groupEnd = Math.max(groupEnd, item.endMin);
+        } else {
+          flushGroup();
+          group.push(item);
+          groupEnd = item.endMin;
+        }
+      });
+
+      flushGroup();
+      return layouts;
+    }
+
+
+    function renderSlot(slot, layout) {
       const preset = getPresetById(slot.presetId);
       const top = slot.startMin * PX_PER_MINUTE;
       const height = slot.durationMin * PX_PER_MINUTE;
+      const columns = Math.max(layout?.columns || 1, 1);
+      const columnIndex = Math.max(layout?.columnIndex || 0, 0);
+      const gap = columns > 1 ? 6 : 0;
+      const widthStyle = columns > 1
+        ? `left:calc(8px + (((100% - 16px - ${(columns - 1) * gap}px) / ${columns}) * ${columnIndex}) + ${columnIndex * gap}px); width:calc((100% - 16px - ${(columns - 1) * gap}px) / ${columns});`
+        : "left:8px; width:calc(100% - 16px);";
       const activeClass = interaction && interaction.slotId === slot.id ? (interaction.mode === "drag" ? "dragging" : "resizing") : "";
+      const compact = height < 70 ? "compact" : "";
+      const noteText = slot.comment && height >= 106 ? `<span class="slot-note">${escapeHtml(slot.comment)}</span>` : "";
       return `
-        <div
-          class="slot ${activeClass}"
-          data-id="${slot.id}"
-          style="top:${top}px;height:${height}px;background:${preset.color};"
-          title="${preset.title}"
-        >
-          <button class="delete-btn" type="button">×</button>
-          <div class="slot-title">${slot.title}</div>
+        <div class="slot ${activeClass} ${compact}" data-id="${slot.id}" style="top:${top}px; height:${height}px; ${widthStyle} background:${preset.color};" title="${escapeHtml(slot.title)}">
+          <button class="delete-btn" type="button" aria-label="Удалить">×</button>
+          <div class="slot-title" data-title-id="${slot.id}">${escapeHtml(slot.title)}</div>
           <div class="slot-meta">${formatTime(slot.startMin)}–${formatTime(slot.startMin + slot.durationMin)}</div>
+          ${noteText}
           <div class="resize-handle"></div>
         </div>
       `;
@@ -1152,7 +1705,6 @@
       const dates = getVisibleDates();
       const isDay = state.view === "day";
       document.documentElement.style.setProperty("--cols", String(dates.length));
-
       const headerClass = isDay ? "day-header-row" : "week-header";
       const daysClass = isDay ? "days-grid day" : "days-grid week";
 
@@ -1164,13 +1716,11 @@
       const columns = dates.map((date) => {
         const iso = toISO(date);
         const weekend = isWeekend(date);
-        const daySlots = getFilteredSlots()
-          .filter((slot) => slot.date === iso)
-          .sort((a, b) => a.startMin - b.startMin);
-
+        const daySlots = getFilteredSlots().filter((slot) => slot.date === iso).sort((a, b) => a.startMin - b.startMin || a.durationMin - b.durationMin);
+        const layouts = buildDayLayouts(daySlots);
         return `
           <div class="day-column ${weekend ? "weekend" : ""}" data-date="${iso}" aria-label="${formatDateLabel(date)}">
-            ${weekend ? '<div class="weekend-center">Выходной</div>' : daySlots.map(renderSlot).join("")}
+            ${weekend ? '<div class="weekend-center">Выходной</div>' : daySlots.map((slot) => renderSlot(slot, layouts.get(slot.id))).join("")}
           </div>
         `;
       }).join("");
@@ -1188,7 +1738,7 @@
     }
 
     function renderMonth() {
-      const cursor = parseISO(state.cursorDate);
+      const cursor = parseISO(state.cursorDate) || new Date();
       const start = startOfMonthGrid(cursor);
       const days = Array.from({ length: 42 }, (_, index) => addDays(start, index));
       const trainerSlots = getFilteredSlots();
@@ -1199,9 +1749,7 @@
             const iso = toISO(date);
             const isCurrentMonth = date.getMonth() === cursor.getMonth();
             const weekend = isWeekend(date);
-            const daySlots = trainerSlots
-              .filter((slot) => slot.date === iso)
-              .sort((a, b) => a.startMin - b.startMin);
+            const daySlots = trainerSlots.filter((slot) => slot.date === iso).sort((a, b) => a.startMin - b.startMin);
             const total = daySlots.reduce((sum, slot) => sum + slot.durationMin, 0);
             return `
               <div class="month-cell ${isCurrentMonth ? "" : "outside"} ${weekend ? "weekend" : ""} ${iso === state.cursorDate ? "active" : ""}" data-month-date="${iso}">
@@ -1212,7 +1760,7 @@
                 <div class="chip-list">
                   ${daySlots.slice(0, 5).map((slot) => {
                     const preset = getPresetById(slot.presetId);
-                    return `<div class="chip" style="background:${preset.color}">${formatTime(slot.startMin)} ${slot.title}</div>`;
+                    return `<div class="chip" style="background:${preset.color}">${formatTime(slot.startMin)} ${escapeHtml(slot.title)}</div>`;
                   }).join("")}
                   ${daySlots.length > 5 ? `<div class="month-total">ещё ${daySlots.length - 5}</div>` : ""}
                   ${!daySlots.length && weekend ? '<div class="month-total">выходной</div>' : ""}
@@ -1236,23 +1784,7 @@
       renderPresets();
       renderSummary();
       renderBoard();
-    }
-
-    function addSlot(dateIso, startMin, durationMin, presetId) {
-      const date = parseISO(dateIso);
-      if (isWeekend(date)) return;
-      const preset = getPresetById(presetId);
-      state.slots.push({
-        id: uid(),
-        trainerId: state.selectedTrainerId,
-        date: dateIso,
-        startMin,
-        durationMin,
-        presetId: preset.id,
-        title: preset.title
-      });
-      persistSlots();
-      renderAll();
+      syncModalTypeUi();
     }
 
     function getSlotById(id) {
@@ -1261,6 +1793,7 @@
 
     function removeSlot(id) {
       state.slots = state.slots.filter((slot) => slot.id !== id);
+      if (participantsViewerState.slotId === id) closeParticipantsViewer();
       persistSlots();
       renderAll();
     }
@@ -1287,7 +1820,8 @@
     }
 
     function updateCursorByStep(step) {
-      const cursor = parseISO(state.cursorDate);
+      closeParticipantsViewer();
+      const cursor = parseISO(state.cursorDate) || new Date();
       let next;
       if (state.view === "day") next = addDays(cursor, step);
       else if (state.view === "week") next = addDays(cursor, step * 7);
@@ -1297,10 +1831,201 @@
       renderAll();
     }
 
+    function openModal(payload) {
+      closeParticipantsViewer();
+      modalState.open = true;
+      modalState.mode = payload.mode;
+      modalState.slotId = payload.slotId || null;
+      modalState.participants = Array.isArray(payload.participants) ? payload.participants.map(normalizeParticipant).filter(Boolean) : [];
+      modalHeading.textContent = payload.mode === "edit" ? "Редактирование карточки" : "Новая карточка";
+      modalPreset.value = payload.presetId;
+      modalTitle.value = payload.title || getPresetById(payload.presetId).title;
+      modalDate.value = payload.date;
+      modalStart.value = formatTime(payload.startMin);
+      modalDuration.value = payload.durationMin;
+      modalComment.value = payload.comment || "";
+      modalDeleteBtn.disabled = payload.mode !== "edit";
+      editorModal.classList.add("open");
+      editorModal.setAttribute("aria-hidden", "false");
+      syncModalTypeUi();
+      renderParticipantTags();
+      setTimeout(() => modalTitle.focus(), 0);
+    }
+
+    function closeModal() {
+      modalState.open = false;
+      modalState.mode = "new";
+      modalState.slotId = null;
+      modalState.participants = [];
+      editorModal.classList.remove("open");
+      editorModal.setAttribute("aria-hidden", "true");
+      participantInput.value = "";
+    }
+
+    function syncModalTypeUi() {
+      const preset = getPresetById(modalPreset.value);
+      participantsSection.classList.toggle("participants-section-hidden", !preset.participants);
+      renderParticipantTags();
+    }
+
+    function renderParticipantTags() {
+      if (!modalState.participants.length) {
+        participantTags.innerHTML = '<span class="tag-empty">Участники не добавлены</span>';
+        return;
+      }
+      participantTags.innerHTML = modalState.participants.map((participant, index) => {
+        const name = typeof participant === "string" ? participant : participant.name;
+        return `
+          <span class="tag-chip">
+            <span>${escapeHtml(name)}</span>
+            <button class="tag-remove" type="button" data-remove-index="${index}" aria-label="Удалить участника">×</button>
+          </span>
+        `;
+      }).join("");
+    }
+
+    function addParticipantFromInput() {
+      const value = participantInput.value.trim();
+      if (!value) return;
+      modalState.participants.push({ name: value, attended: null });
+      participantInput.value = "";
+      renderParticipantTags();
+      participantInput.focus();
+    }
+
+    function collectModalData() {
+      const preset = getPresetById(modalPreset.value);
+      const date = modalDate.value;
+      const title = modalTitle.value.trim() || preset.title;
+      const startAbsMin = parseTime(modalStart.value || "09:00");
+      const durationMin = snapMinutes(Number(modalDuration.value || preset.defaultDuration));
+      const startMin = startAbsMin - START_HOUR * 60;
+      const endMin = startMin + durationMin;
+      const dateObj = parseISO(date);
+      if (!dateObj || isWeekend(dateObj)) {
+        alert("Суббота и воскресенье недоступны.");
+        return null;
+      }
+      if (startMin < 0 || endMin > TOTAL_MINUTES || durationMin <= 0) {
+        alert("Рабочее время только с 09:00 до 18:00.");
+        return null;
+      }
+      return {
+        trainerId: state.selectedTrainerId,
+        date,
+        startMin,
+        durationMin,
+        presetId: preset.id,
+        title,
+        comment: modalComment.value.trim(),
+        participants: preset.participants ? modalState.participants.map(normalizeParticipant).filter(Boolean) : []
+      };
+    }
+
+    function saveFromModal() {
+      const payload = collectModalData();
+      if (!payload) return;
+      let savedSlotId = modalState.slotId;
+      if (modalState.mode === "edit" && modalState.slotId) {
+        state.slots = state.slots.map((slot) => slot.id === modalState.slotId ? { ...slot, ...payload } : slot);
+      } else {
+        savedSlotId = uid();
+        state.slots.push({ id: savedSlotId, ...payload });
+      }
+      state.slots = sanitizeSlots(state.slots);
+      state.cursorDate = payload.date;
+      saveUiState();
+      closeModal();
+      persistSlots();
+      renderAll();
+      requestAnimationFrame(() => {
+        const savedEl = document.querySelector(`.slot[data-id="${savedSlotId}"]`);
+        if (savedEl) {
+          savedEl.scrollIntoView({ block: "nearest", inline: "nearest" });
+          savedEl.animate([
+            { transform: "scale(0.98)", boxShadow: "0 12px 18px rgba(15, 23, 42, 0.18)" },
+            { transform: "scale(1.02)", boxShadow: "0 16px 24px rgba(15, 23, 42, 0.24)" },
+            { transform: "scale(1)", boxShadow: "0 12px 18px rgba(15, 23, 42, 0.18)" }
+          ], { duration: 450, easing: "ease-out" });
+        }
+      });
+    }
+
+    function openModalForSlot(slotId) {
+      const slot = getSlotById(slotId);
+      if (!slot) return;
+      openModal({
+        mode: "edit",
+        slotId: slot.id,
+        presetId: slot.presetId,
+        title: slot.title,
+        date: slot.date,
+        startMin: slot.startMin,
+        durationMin: slot.durationMin,
+        participants: slot.participants,
+        comment: slot.comment
+      });
+    }
+
+    function openModalForNew(dateIso, startMin) {
+      const preset = getPresetById(state.selectedPresetId);
+      openModal({
+        mode: "new",
+        slotId: null,
+        presetId: preset.id,
+        title: preset.title,
+        date: dateIso,
+        startMin,
+        durationMin: Math.min(preset.defaultDuration, TOTAL_MINUTES - startMin),
+        participants: [],
+        comment: ""
+      });
+    }
+
+    function startInlineTitleEdit(slotId, titleEl) {
+      const slot = getSlotById(slotId);
+      if (!slot || titleEl.querySelector("input")) return;
+      const original = slot.title;
+      const input = document.createElement("input");
+      input.className = "slot-title-input";
+      input.value = original;
+      titleEl.innerHTML = "";
+      titleEl.appendChild(input);
+      input.focus();
+      input.select();
+
+      const finish = (save) => {
+        if (!document.body.contains(input)) return;
+        const nextTitle = input.value.trim() || getPresetById(slot.presetId).title;
+        if (save && nextTitle !== slot.title) {
+          state.slots = state.slots.map((item) => item.id === slotId ? { ...item, title: nextTitle } : item);
+          persistSlots();
+          renderAll();
+        } else {
+          renderAll();
+        }
+      };
+
+      input.addEventListener("mousedown", (event) => event.stopPropagation());
+      input.addEventListener("click", (event) => event.stopPropagation());
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          finish(true);
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          finish(false);
+        }
+      });
+      input.addEventListener("blur", () => finish(true), { once: true });
+    }
+
     trainerTabs.addEventListener("click", (event) => {
       const button = event.target.closest(".tab-btn[data-trainer-id]");
       if (!button) return;
       state.selectedTrainerId = button.dataset.trainerId;
+      closeParticipantsViewer();
       saveUiState();
       renderAll();
     });
@@ -1309,12 +2034,13 @@
       const button = event.target.closest(".tab-btn[data-view-id]");
       if (!button) return;
       state.view = button.dataset.viewId;
+      closeParticipantsViewer();
       saveUiState();
       renderAll();
     });
 
     presetList.addEventListener("click", (event) => {
-      const button = event.target.closest(".preset-btn");
+      const button = event.target.closest(".preset-btn[data-preset-id]");
       if (!button) return;
       state.selectedPresetId = button.dataset.presetId;
       saveUiState();
@@ -1325,6 +2051,7 @@
     nextBtn.addEventListener("click", () => updateCursorByStep(1));
     todayBtn.addEventListener("click", () => {
       state.cursorDate = toISO(new Date());
+      closeParticipantsViewer();
       saveUiState();
       renderAll();
     });
@@ -1332,11 +2059,79 @@
     dateInput.addEventListener("change", () => {
       if (!dateInput.value) return;
       state.cursorDate = dateInput.value;
+      closeParticipantsViewer();
       saveUiState();
       renderAll();
     });
 
-    document.addEventListener("click", (event) => {
+    modalPreset.addEventListener("change", () => {
+      const preset = getPresetById(modalPreset.value);
+      if (!modalTitle.value.trim() || PRESETS.some((item) => item.title === modalTitle.value.trim())) {
+        modalTitle.value = preset.title;
+      }
+      const currentDuration = Number(modalDuration.value || 0);
+      if (!currentDuration || PRESETS.some((item) => item.defaultDuration === currentDuration)) {
+        modalDuration.value = preset.defaultDuration;
+      }
+      syncModalTypeUi();
+    });
+
+    participantAddBtn.addEventListener("click", addParticipantFromInput);
+    participantInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addParticipantFromInput();
+      }
+    });
+
+    participantTags.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-remove-index]");
+      if (!btn) return;
+      modalState.participants.splice(Number(btn.dataset.removeIndex), 1);
+      renderParticipantTags();
+    });
+
+    modalCloseBtn.addEventListener("click", closeModal);
+    modalSaveBtn.addEventListener("click", saveFromModal);
+    modalDeleteBtn.addEventListener("click", () => {
+      if (!modalState.slotId) return;
+      removeSlot(modalState.slotId);
+      closeModal();
+    });
+    participantsViewerList.addEventListener("click", (event) => {
+      const attendBtn = event.target.closest("[data-attend]");
+      if (!attendBtn) return;
+      const slotId = attendBtn.dataset.slotId;
+      const index = Number(attendBtn.dataset.index);
+      const nextValue = attendBtn.dataset.attend === "yes" ? true : false;
+      state.slots = state.slots.map((slot) => {
+        if (slot.id !== slotId) return slot;
+        const participants = (slot.participants || []).map((participant, i) => i === index ? { ...participant, attended: participant.attended === nextValue ? null : nextValue } : participant);
+        return { ...slot, participants };
+      });
+      persistSlots();
+      const nextSlot = getSlotById(slotId);
+      if (nextSlot) {
+        renderParticipantsViewer(nextSlot);
+        renderBoard();
+      }
+    });
+
+    editorModal.addEventListener("click", (event) => {
+      if (event.target === editorModal) closeModal();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && modalState.open) closeModal();
+    });
+
+    participantsViewerCloseBtn.addEventListener("click", closeParticipantsViewer);
+    participantsViewerModal.addEventListener("click", (event) => {
+      if (event.target === participantsViewerModal) closeParticipantsViewer();
+    });
+
+
+
+    boardContent.addEventListener("click", (event) => {
       const deleteBtn = event.target.closest(".delete-btn");
       if (deleteBtn) {
         const slotEl = deleteBtn.closest(".slot");
@@ -1347,6 +2142,9 @@
       if (state.view === "month") {
         const monthCell = event.target.closest(".month-cell[data-month-date]");
         if (!monthCell) return;
+        const monthDate = parseISO(monthCell.dataset.monthDate);
+        if (monthDate && isWeekend(monthDate)) return;
+        closeParticipantsViewer();
         state.cursorDate = monthCell.dataset.monthDate;
         state.view = "day";
         saveUiState();
@@ -1354,40 +2152,53 @@
         return;
       }
 
-      if (event.target.closest(".slot")) return;
+      const slotEl = event.target.closest(".slot");
+      if (slotEl) {
+        if (event.target.closest(".resize-handle")) return;
+        openModalForSlot(slotEl.dataset.id);
+        return;
+      }
+
       const column = event.target.closest(".day-column[data-date]");
       if (!column || column.classList.contains("weekend")) return;
       const rect = column.getBoundingClientRect();
-      const durationMin = Number(durationSelect.value);
       const y = clamp(event.clientY - rect.top, 0, rect.height);
-      const startMin = clamp(snapMinutes(y / PX_PER_MINUTE), 0, TOTAL_MINUTES - durationMin);
-      addSlot(column.dataset.date, startMin, durationMin, state.selectedPresetId);
+      const startMin = clamp(snapMinutes(y / PX_PER_MINUTE), 0, TOTAL_MINUTES - SNAP);
+      openModalForNew(column.dataset.date, startMin);
     });
 
+
+
     document.addEventListener("mousedown", (event) => {
-      if (state.view === "month") return;
-      if (event.target.closest(".delete-btn")) return;
+      if (state.view === "month" || modalState.open) return;
+      if (
+        event.target.closest(".delete-btn") ||
+        event.target.closest(".slot-title-input") ||
+        event.target.closest("#participantsViewerModal") ||
+        event.target.closest(".attend-btn")
+      ) return;
       const resizeHandle = event.target.closest(".resize-handle");
-      const slotEl = event.target.closest(".slot");
+      if (!resizeHandle) return;
+      const slotEl = resizeHandle.closest(".slot");
       if (!slotEl) return;
       const slot = getSlotById(slotEl.dataset.id);
       if (!slot) return;
       interaction = {
         slotId: slot.id,
-        mode: resizeHandle ? "resize" : "drag",
+        mode: "resize",
         startX: event.clientX,
         startY: event.clientY,
         originalDate: slot.date,
         originalStart: slot.startMin,
         originalDuration: slot.durationMin
       };
-      document.body.style.cursor = resizeHandle ? "ns-resize" : "grabbing";
+      document.body.style.cursor = "ns-resize";
       event.preventDefault();
       renderBoard();
     });
 
     document.addEventListener("mousemove", (event) => {
-      if (!interaction || state.view === "month") return;
+      if (!interaction || state.view === "month" || modalState.open) return;
       const slot = getSlotById(interaction.slotId);
       if (!slot) return;
       const deltaY = event.clientY - interaction.startY;
@@ -1395,23 +2206,11 @@
 
       if (interaction.mode === "drag") {
         const nextDate = getNearestVisibleDate(event.clientX) || interaction.originalDate;
-        const nextStart = clamp(
-          interaction.originalStart + deltaMinutes,
-          0,
-          TOTAL_MINUTES - interaction.originalDuration
-        );
-        state.slots = state.slots.map((item) => item.id === interaction.slotId
-          ? { ...item, date: nextDate, startMin: nextStart }
-          : item);
+        const nextStart = clamp(interaction.originalStart + deltaMinutes, 0, TOTAL_MINUTES - interaction.originalDuration);
+        state.slots = state.slots.map((item) => item.id === interaction.slotId ? { ...item, date: nextDate, startMin: nextStart } : item);
       } else {
-        const nextDuration = clamp(
-          interaction.originalDuration + deltaMinutes,
-          SNAP,
-          TOTAL_MINUTES - interaction.originalStart
-        );
-        state.slots = state.slots.map((item) => item.id === interaction.slotId
-          ? { ...item, durationMin: nextDuration }
-          : item);
+        const nextDuration = clamp(interaction.originalDuration + deltaMinutes, SNAP, TOTAL_MINUTES - interaction.originalStart);
+        state.slots = state.slots.map((item) => item.id === interaction.slotId ? { ...item, durationMin: nextDuration } : item);
       }
 
       renderBoard();
@@ -1431,3 +2230,4 @@
   </script>
 </body>
 </html>
+
