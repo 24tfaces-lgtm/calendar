@@ -931,6 +931,44 @@
       font-weight: 600;
     }
 
+    .participant-editor-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .participant-editor-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: #f8fbff;
+      border: 1px solid #e5edf5;
+    }
+
+    .participant-editor-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 14px;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .participant-editor-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .participant-editor-actions .attend-btn {
+      min-width: 64px;
+    }
+
     .modal-actions {
       display: flex;
       align-items: center;
@@ -1385,6 +1423,15 @@
       return { name, attended };
     }
 
+    function getAttendanceStats(participants) {
+      const list = Array.isArray(participants) ? participants : [];
+      const total = list.length;
+      const yes = list.filter((participant) => participant && participant.attended === true).length;
+      const no = list.filter((participant) => participant && participant.attended === false).length;
+      const pending = total - yes - no;
+      return { total, yes, no, pending };
+    }
+
 
     function renderParticipantsViewer(slot) {
       const preset = getPresetById(slot.presetId);
@@ -1815,6 +1862,111 @@
         .sort((a, b) => `${a.date}${String(a.startMin).padStart(4, "0")}${a.id}`.localeCompare(`${b.date}${String(b.startMin).padStart(4, "0")}${b.id}`));
     }
 
+    function getOverlapMinutes(slotA, slotB) {
+      const start = Math.max(slotA.startMin, slotB.startMin);
+      const end = Math.min(slotA.startMin + slotA.durationMin, slotB.startMin + slotB.durationMin);
+      return Math.max(0, end - start);
+    }
+
+    function getOverlapRatio(slotA, slotB) {
+      const overlap = getOverlapMinutes(slotA, slotB);
+      if (!overlap) return 0;
+      return overlap / Math.max(slotA.durationMin, slotB.durationMin, 1);
+    }
+
+    function areSlotsNearDuplicate(slotA, slotB) {
+      if (!slotA || !slotB) return false;
+      if (slotA.trainerId !== slotB.trainerId) return false;
+      if (slotA.date !== slotB.date) return false;
+      if (slotA.presetId !== slotB.presetId) return false;
+      const titleA = normalizeLookupText(slotA.title || getPresetById(slotA.presetId).title);
+      const titleB = normalizeLookupText(slotB.title || getPresetById(slotB.presetId).title);
+      if (titleA !== titleB) return false;
+      return getOverlapRatio(slotA, slotB) >= 0.8;
+    }
+
+    function getConflictPriority(slot) {
+      const preset = getPresetById(slot.presetId);
+      let score = getSlotDetailScore(slot) * 100;
+      if (slot.title && normalizeLookupText(slot.title) !== normalizeLookupText(preset.title)) score += 25;
+      if (slot.comment) score += 10;
+      if (Array.isArray(slot.participants)) score += slot.participants.length * 3;
+      if (slot.id && !String(slot.id).startsWith("slot-")) score += 5;
+      score += Math.round(slot.durationMin / SNAP);
+      return score;
+    }
+
+    function choosePreferredSlot(slotA, slotB) {
+      const scoreA = getConflictPriority(slotA);
+      const scoreB = getConflictPriority(slotB);
+      if (scoreA !== scoreB) return scoreA > scoreB ? slotA : slotB;
+      if (slotA.startMin !== slotB.startMin) return slotA.startMin < slotB.startMin ? slotA : slotB;
+      if (slotA.durationMin !== slotB.durationMin) return slotA.durationMin > slotB.durationMin ? slotA : slotB;
+      return String(slotA.id).localeCompare(String(slotB.id)) <= 0 ? slotA : slotB;
+    }
+
+    function mergeNearDuplicateSlots(slots) {
+      const result = [];
+      slots.forEach((slot) => {
+        const index = result.findIndex((existing) => areSlotsNearDuplicate(existing, slot));
+        if (index === -1) {
+          result.push(slot);
+          return;
+        }
+        const primary = choosePreferredSlot(result[index], slot);
+        const secondary = primary === result[index] ? slot : result[index];
+        result[index] = mergeSlots(primary, secondary);
+      });
+      return result;
+    }
+
+    function resolveConflictingSlots(slots) {
+      const byTrainerDay = new Map();
+      slots.forEach((slot) => {
+        const key = `${slot.trainerId}::${slot.date}`;
+        if (!byTrainerDay.has(key)) byTrainerDay.set(key, []);
+        byTrainerDay.get(key).push(slot);
+      });
+
+      const cleaned = [];
+      byTrainerDay.forEach((group) => {
+        const mergedGroup = mergeNearDuplicateSlots(group);
+        const selected = [];
+        mergedGroup
+          .slice()
+          .sort((a, b) => {
+            const scoreDiff = getConflictPriority(b) - getConflictPriority(a);
+            if (scoreDiff !== 0) return scoreDiff;
+            if (a.startMin !== b.startMin) return a.startMin - b.startMin;
+            if (b.durationMin !== a.durationMin) return b.durationMin - a.durationMin;
+            return String(a.id).localeCompare(String(b.id));
+          })
+          .forEach((slot) => {
+            const overlapIndex = selected.findIndex((existing) => rangesOverlap(existing.startMin, existing.durationMin, slot.startMin, slot.durationMin));
+            if (overlapIndex === -1) {
+              selected.push(slot);
+              return;
+            }
+
+            const existing = selected[overlapIndex];
+            if (areSlotsNearDuplicate(existing, slot)) {
+              const primary = choosePreferredSlot(existing, slot);
+              const secondary = primary === existing ? slot : existing;
+              selected[overlapIndex] = mergeSlots(primary, secondary);
+            }
+          });
+
+        cleaned.push(...selected);
+      });
+
+      return cleaned.sort((a, b) => `${a.date}${String(a.startMin).padStart(4, "0")}${a.id}`.localeCompare(`${b.date}${String(b.startMin).padStart(4, "0")}${b.id}`));
+    }
+
+    function normalizeResolvedSlots(rawSlots) {
+      const deduped = dedupeSlots(rawSlots);
+      return resolveConflictingSlots(deduped);
+    }
+
     function normalizeSlotRecord(slot) {
       if (!slot || typeof slot !== "object") return null;
       const trainerId = normalizeTrainerId(slot);
@@ -1863,7 +2015,7 @@
       const normalized = rawSlots
         .map((slot) => normalizeSlotRecord(slot))
         .filter(Boolean);
-      return dedupeSlots(normalized);
+      return normalizeResolvedSlots(normalized);
     }
 
     function serializeSlot(slot, includeId = false) {
@@ -2145,69 +2297,102 @@
       }
     }
 
+    async function collectKnownBoardIdsForSync(boardRef, boardId) {
+      if (boardId === getBoardId()) {
+        return {
+          rootIds: new Set(remoteKnownRootSlotIds),
+          trainerIdsByTrainer: Object.fromEntries(TRAINERS.map((trainer) => [trainer.id, new Set(remoteKnownTrainerSlotIds[trainer.id] || [])]))
+        };
+      }
+
+      const rootSnapshot = await boardRef.collection("slots").get();
+      const trainerIdsByTrainer = {};
+      await Promise.all(TRAINERS.map(async (trainer) => {
+        const trainerSnapshot = await boardRef.collection("trainers").doc(trainer.id).collection("slots").get();
+        trainerIdsByTrainer[trainer.id] = new Set(trainerSnapshot.docs.map((doc) => doc.id));
+      }));
+
+      return {
+        rootIds: new Set(rootSnapshot.docs.map((doc) => doc.id)),
+        trainerIdsByTrainer
+      };
+    }
+
+    async function persistBoardSlots(boardId, normalizedSlots) {
+      const boardRef = remoteDb.collection("frdBoards").doc(boardId);
+      const slotsRef = boardRef.collection("slots");
+      const knownIds = await collectKnownBoardIdsForSync(boardRef, boardId);
+      const batch = remoteDb.batch();
+      const rootIds = new Set();
+
+      batch.set(boardRef, {
+        boardId,
+        version: 5,
+        slots: normalizedSlots.map((slot) => serializeSlot(slot, true)),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      normalizedSlots.forEach((slot) => {
+        rootIds.add(slot.id);
+        batch.set(slotsRef.doc(slot.id), {
+          ...serializeSlot(slot),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      });
+
+      knownIds.rootIds.forEach((slotId) => {
+        if (!rootIds.has(slotId)) {
+          batch.delete(slotsRef.doc(slotId));
+        }
+      });
+
+      TRAINERS.forEach((trainer) => {
+        const trainerSlots = normalizedSlots.filter((slot) => slot.trainerId === trainer.id);
+        const trainerDocRef = boardRef.collection("trainers").doc(trainer.id);
+        const trainerSubRef = trainerDocRef.collection("slots");
+        const trainerIds = new Set();
+
+        batch.set(trainerDocRef, {
+          trainerId: trainer.id,
+          name: trainer.name,
+          slots: trainerSlots.map((slot) => serializeSlot(slot, true)),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        trainerSlots.forEach((slot) => {
+          trainerIds.add(slot.id);
+          batch.set(trainerSubRef.doc(slot.id), {
+            ...serializeSlot(slot),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        });
+
+        (knownIds.trainerIdsByTrainer[trainer.id] || new Set()).forEach((slotId) => {
+          if (!trainerIds.has(slotId)) {
+            batch.delete(trainerSubRef.doc(slotId));
+          }
+        });
+
+        if (boardId === getBoardId()) {
+          remoteKnownTrainerSlotIds[trainer.id] = trainerIds;
+        }
+      });
+
+      await batch.commit();
+      if (boardId === getBoardId()) {
+        remoteKnownRootSlotIds = rootIds;
+      }
+    }
+
     async function persistSlots() {
       state.slots = sanitizeSlots(state.slots);
       saveSlotsLocal();
       if (!syncEnabled || !remoteBoardRef || !remoteSlotsRef || !remoteReady) return;
 
       try {
-        const batch = remoteDb.batch();
         const normalizedSlots = sanitizeSlots(state.slots);
-        const rootIds = new Set();
-
-        batch.set(remoteBoardRef, {
-          boardId: getBoardId(),
-          version: 4,
-          slots: normalizedSlots.map((slot) => serializeSlot(slot, true)),
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-
-        normalizedSlots.forEach((slot) => {
-          rootIds.add(slot.id);
-          batch.set(remoteSlotsRef.doc(slot.id), {
-            ...serializeSlot(slot),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-        });
-
-        remoteKnownRootSlotIds.forEach((slotId) => {
-          if (!rootIds.has(slotId)) {
-            batch.delete(remoteSlotsRef.doc(slotId));
-          }
-        });
-
-        TRAINERS.forEach((trainer) => {
-          const trainerSlots = normalizedSlots.filter((slot) => slot.trainerId === trainer.id);
-          const trainerDocRef = remoteBoardRef.collection("trainers").doc(trainer.id);
-          const trainerSubRef = trainerDocRef.collection("slots");
-          const trainerIds = new Set();
-
-          batch.set(trainerDocRef, {
-            trainerId: trainer.id,
-            name: trainer.name,
-            slots: trainerSlots.map((slot) => serializeSlot(slot, true)),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-
-          trainerSlots.forEach((slot) => {
-            trainerIds.add(slot.id);
-            batch.set(trainerSubRef.doc(slot.id), {
-              ...serializeSlot(slot),
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-          });
-
-          (remoteKnownTrainerSlotIds[trainer.id] || new Set()).forEach((slotId) => {
-            if (!trainerIds.has(slotId)) {
-              batch.delete(trainerSubRef.doc(slotId));
-            }
-          });
-
-          remoteKnownTrainerSlotIds[trainer.id] = trainerIds;
-        });
-
-        await batch.commit();
-        remoteKnownRootSlotIds = rootIds;
+        const familyBoardIds = getBoardFamilyIds();
+        await Promise.all(familyBoardIds.map((boardId) => persistBoardSlots(boardId, normalizedSlots)));
         updateSyncBadge("online", "Онлайн");
       } catch (error) {
         console.error(error);
@@ -2426,14 +2611,24 @@
         ? `left:calc(8px + (((100% - 16px - ${(columns - 1) * gap}px) / ${columns}) * ${columnIndex}) + ${columnIndex * gap}px); width:calc((100% - 16px - ${(columns - 1) * gap}px) / ${columns});`
         : "left:8px; width:calc(100% - 16px);";
       const activeClass = interaction && interaction.slotId === slot.id ? (interaction.mode === "drag" ? "dragging" : "resizing") : "";
-      const compact = height < 70 ? "compact" : "";
-      const noteText = slot.comment && height >= 106 ? `<span class="slot-note">${escapeHtml(slot.comment)}</span>` : "";
+      const compact = height < 92 ? "compact" : "";
+      const noteText = slot.comment && height >= 118 ? `<span class="slot-note">${escapeHtml(slot.comment)}</span>` : "";
+      const attendance = getAttendanceStats(slot.participants || []);
+      const showParticipants = preset.participants && attendance.total > 0;
+      const participantsText = showParticipants
+        ? `<span class="slot-participants">Явка: ${attendance.yes}/${attendance.total}${attendance.pending ? ` · без отметки ${attendance.pending}` : ""}</span>`
+        : "";
+      const participantsButton = showParticipants && height >= 92
+        ? `<div class="slot-actions"><button class="participant-toggle-btn" type="button" data-open-participants="${slot.id}">Отметить явку</button></div>`
+        : "";
       return `
         <div class="slot ${activeClass} ${compact}" data-id="${slot.id}" style="top:${top}px; height:${height}px; ${widthStyle} background:${preset.color};" title="${escapeHtml(trainer.name)} · ${escapeHtml(slot.title)}">
           <button class="delete-btn" type="button" aria-label="Удалить">×</button>
           <div class="slot-title" data-title-id="${slot.id}">${escapeHtml(slot.title)}</div>
           <div class="slot-meta">${formatTime(slot.startMin)}–${formatTime(slot.startMin + slot.durationMin)}</div>
           ${noteText}
+          ${participantsText}
+          ${participantsButton}
           <div class="resize-handle"></div>
         </div>
       `;
@@ -2634,15 +2829,26 @@
         participantTags.innerHTML = '<span class="tag-empty">Участники не добавлены</span>';
         return;
       }
-      participantTags.innerHTML = modalState.participants.map((participant, index) => {
-        const name = typeof participant === "string" ? participant : participant.name;
-        return `
-          <span class="tag-chip">
-            <span>${escapeHtml(name)}</span>
-            <button class="tag-remove" type="button" data-remove-index="${index}" aria-label="Удалить участника">×</button>
-          </span>
-        `;
-      }).join("");
+      const stats = getAttendanceStats(modalState.participants);
+      participantTags.innerHTML = `
+        <div class="participant-editor-list">
+          <div class="participant-viewer-row">
+            <div class="participant-viewer-name">Явка</div>
+            <button class="attend-btn ${stats.yes ? "active-yes" : ""}" type="button" disabled>${stats.yes} был${stats.yes === 1 ? "" : "о"}</button>
+            <button class="attend-btn ${stats.no ? "active-no" : ""}" type="button" disabled>${stats.no} не был${stats.no === 1 ? "" : "и"}</button>
+          </div>
+          ${modalState.participants.map((participant, index) => `
+            <div class="participant-editor-row">
+              <div class="participant-editor-name">${escapeHtml(participant.name)}</div>
+              <div class="participant-editor-actions">
+                <button class="attend-btn ${participant.attended === true ? "active-yes" : ""}" type="button" data-modal-attend="yes" data-index="${index}">Был</button>
+                <button class="attend-btn ${participant.attended === false ? "active-no" : ""}" type="button" data-modal-attend="no" data-index="${index}">Не был</button>
+                <button class="tag-remove" type="button" data-remove-index="${index}" aria-label="Удалить участника">×</button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
     }
 
     function addParticipantFromInput() {
@@ -2652,6 +2858,17 @@
       participantInput.value = "";
       renderParticipantTags();
       participantInput.focus();
+    }
+
+    function toggleModalParticipantAttendance(index, nextValue) {
+      if (!Number.isInteger(index) || index < 0 || index >= modalState.participants.length) return;
+      const current = modalState.participants[index];
+      if (!current) return;
+      modalState.participants[index] = {
+        ...current,
+        attended: current.attended === nextValue ? null : nextValue
+      };
+      renderParticipantTags();
     }
 
     function collectModalData() {
@@ -2847,6 +3064,13 @@
     });
 
     participantTags.addEventListener("click", (event) => {
+      const attendBtn = event.target.closest("[data-modal-attend]");
+      if (attendBtn) {
+        const index = Number(attendBtn.dataset.index);
+        const nextValue = attendBtn.dataset.modalAttend === "yes" ? true : false;
+        toggleModalParticipantAttendance(index, nextValue);
+        return;
+      }
       const btn = event.target.closest("[data-remove-index]");
       if (!btn) return;
       modalState.participants.splice(Number(btn.dataset.removeIndex), 1);
@@ -2901,6 +3125,13 @@
         return;
       }
 
+      const participantsBtn = event.target.closest("[data-open-participants]");
+      if (participantsBtn) {
+        const slot = getSlotById(participantsBtn.dataset.openParticipants);
+        if (slot) renderParticipantsViewer(slot);
+        return;
+      }
+
       if (state.view === "month") {
         const monthCell = event.target.closest(".month-cell[data-month-date]");
         if (!monthCell) return;
@@ -2937,7 +3168,8 @@
         event.target.closest(".delete-btn") ||
         event.target.closest(".slot-title-input") ||
         event.target.closest("#participantsViewerModal") ||
-        event.target.closest(".attend-btn")
+        event.target.closest(".attend-btn") ||
+        event.target.closest(".participant-toggle-btn")
       ) return;
       const resizeHandle = event.target.closest(".resize-handle");
       if (!resizeHandle) return;
