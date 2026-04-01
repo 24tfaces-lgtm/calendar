@@ -1,6 +1,8 @@
 
 
 
+
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -212,6 +214,18 @@
       border-color: transparent;
       background: #f8fbff;
       box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16);
+    }
+
+    .tab-btn small {
+      display: block;
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .tab-btn.active small {
+      color: var(--text);
     }
 
     .preset-btn {
@@ -1163,14 +1177,24 @@
       { id: "vacation", title: "Отпуск", color: "#64748b", defaultDuration: TOTAL_MINUTES, participants: false }
     ];
 
+    const TRAINER_COLORS = {
+      valeria: "#7c3aed",
+      arina: "#0ea5e9",
+      yuliya: "#16a34a",
+      laura: "#f97316",
+      sofiya: "#db2777"
+    };
+
     let state = loadState();
     let interaction = null;
     let participantsViewerState = { open: false, slotId: null };
     let remoteDb = null;
-    let remoteDocRef = null;
+    let remoteBoardRef = null;
+    let remoteSlotsRef = null;
     let remoteUnsubscribe = null;
     let syncEnabled = false;
     let remoteReady = false;
+    let remoteKnownSlotIds = new Set();
     let modalState = {
       open: false,
       mode: "new",
@@ -1453,26 +1477,25 @@
       try {
         const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(window.FRD_FIREBASE_CONFIG);
         remoteDb = firebase.firestore(app);
-        remoteDocRef = remoteDb.collection("frdBoards").doc(getBoardId());
+        remoteBoardRef = remoteDb.collection("frdBoards").doc(getBoardId());
+        remoteSlotsRef = remoteBoardRef.collection("slots");
         syncEnabled = true;
         updateSyncBadge("offline", "Подключение...");
 
-        remoteUnsubscribe = remoteDocRef.onSnapshot(async (doc) => {
-          const data = doc.data();
-          if (!doc.exists || !data) {
-            await remoteDocRef.set({
-              slots: state.slots,
-              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-              version: 2
-            }, { merge: true });
-            remoteReady = true;
+        remoteUnsubscribe = remoteSlotsRef.onSnapshot(async (snapshot) => {
+          const remoteSlots = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          remoteKnownSlotIds = new Set(snapshot.docs.map((doc) => doc.id));
+          remoteReady = true;
+
+          if (snapshot.empty && state.slots.length) {
+            await persistSlots();
             updateSyncBadge("online", "Онлайн");
+            renderAll();
             return;
           }
-          state.slots = sanitizeSlots(data.slots || []);
+
+          state.slots = sanitizeSlots(remoteSlots);
           saveSlotsLocal();
-          remoteReady = true;
           updateSyncBadge("online", "Онлайн");
           renderAll();
         }, (error) => {
@@ -1489,13 +1512,35 @@
 
     async function persistSlots() {
       saveSlotsLocal();
-      if (!syncEnabled || !remoteDocRef || !remoteReady) return;
+      if (!syncEnabled || !remoteBoardRef || !remoteSlotsRef || !remoteReady) return;
       try {
-        await remoteDocRef.set({
-          slots: state.slots,
+        const batch = remoteDb.batch();
+        const currentIds = new Set();
+
+        batch.set(remoteBoardRef, {
+          boardId: getBoardId(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          version: 2
+          version: 3
         }, { merge: true });
+
+        state.slots.forEach((slot) => {
+          currentIds.add(slot.id);
+          const { id, ...payload } = slot;
+          batch.set(remoteSlotsRef.doc(id), {
+            ...payload,
+            participants: Array.isArray(slot.participants) ? slot.participants : [],
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        });
+
+        remoteKnownSlotIds.forEach((slotId) => {
+          if (!currentIds.has(slotId)) {
+            batch.delete(remoteSlotsRef.doc(slotId));
+          }
+        });
+
+        await batch.commit();
+        remoteKnownSlotIds = currentIds;
         updateSyncBadge("online", "Онлайн");
       } catch (error) {
         console.error(error);
@@ -1505,6 +1550,10 @@
 
     function getFilteredSlots() {
       return state.slots.filter((slot) => slot.trainerId === state.selectedTrainerId);
+    }
+
+    function getSlotsForTrainer(trainerId) {
+      return state.slots.filter((slot) => slot.trainerId === trainerId);
     }
 
     function getVisibleDates() {
@@ -1534,13 +1583,25 @@
 
     function slotInPeriod(slot) {
       const bounds = getPeriodBounds();
-      return slot.date >= bounds.start && slot.date <= bounds.end && slot.trainerId === state.selectedTrainerId;
+      return slot.date >= bounds.start && slot.date <= bounds.end;
+    }
+
+    function getTrainerMinutesForPeriod(trainerId) {
+      return state.slots
+        .filter((slot) => slot.trainerId === trainerId && slotInPeriod(slot))
+        .reduce((sum, slot) => sum + slot.durationMin, 0);
     }
 
     function renderTrainerTabs() {
-      trainerTabs.innerHTML = TRAINERS.map((trainer) => `
-        <button class="tab-btn ${trainer.id === state.selectedTrainerId ? "active" : ""}" data-trainer-id="${trainer.id}" type="button">${trainer.name}</button>
-      `).join("");
+      trainerTabs.innerHTML = TRAINERS.map((trainer) => {
+        const minutes = getTrainerMinutesForPeriod(trainer.id);
+        return `
+          <button class="tab-btn ${trainer.id === state.selectedTrainerId ? "active" : ""}" data-trainer-id="${trainer.id}" type="button">
+            <span>${trainer.name}</span>
+            <small>${minutes ? formatDuration(minutes) : "0 м"}</small>
+          </button>
+        `;
+      }).join("");
     }
 
     function renderViewTabs() {
@@ -1567,7 +1628,7 @@
     }
 
     function renderSummary() {
-      const periodSlots = state.slots.filter(slotInPeriod);
+      const periodSlots = state.slots.filter((slot) => slotInPeriod(slot) && slot.trainerId === state.selectedTrainerId);
       const totals = PRESETS.map((preset) => {
         const minutes = periodSlots
           .filter((slot) => slot.presetId === preset.id)
@@ -1576,6 +1637,10 @@
       });
 
       const overall = totals.reduce((sum, item) => sum + item.minutes, 0);
+      const allTrainerTotal = state.slots
+        .filter(slotInPeriod)
+        .reduce((sum, slot) => sum + slot.durationMin, 0);
+
       const items = totals
         .filter((item) => item.minutes > 0)
         .map((item) => `
@@ -1590,10 +1655,14 @@
         .join("");
 
       summaryEl.innerHTML = `
-        ${items || '<div class="empty-note">Пусто</div>'}
+        ${items || '<div class="empty-note">У выбранного тренера пока пусто</div>'}
         <div class="summary-total">
-          <span>Всего</span>
+          <span>Выбранный тренер</span>
           <span>${formatDuration(overall)}</span>
+        </div>
+        <div class="summary-total">
+          <span>Все тренеры</span>
+          <span>${formatDuration(allTrainerTotal)}</span>
         </div>
       `;
     }
@@ -1680,6 +1749,7 @@
 
     function renderSlot(slot, layout) {
       const preset = getPresetById(slot.presetId);
+      const trainer = getTrainerById(slot.trainerId);
       const top = slot.startMin * PX_PER_MINUTE;
       const height = slot.durationMin * PX_PER_MINUTE;
       const columns = Math.max(layout?.columns || 1, 1);
@@ -1692,7 +1762,7 @@
       const compact = height < 70 ? "compact" : "";
       const noteText = slot.comment && height >= 106 ? `<span class="slot-note">${escapeHtml(slot.comment)}</span>` : "";
       return `
-        <div class="slot ${activeClass} ${compact}" data-id="${slot.id}" style="top:${top}px; height:${height}px; ${widthStyle} background:${preset.color};" title="${escapeHtml(slot.title)}">
+        <div class="slot ${activeClass} ${compact}" data-id="${slot.id}" style="top:${top}px; height:${height}px; ${widthStyle} background:${preset.color};" title="${escapeHtml(trainer.name)} · ${escapeHtml(slot.title)}">
           <button class="delete-btn" type="button" aria-label="Удалить">×</button>
           <div class="slot-title" data-title-id="${slot.id}">${escapeHtml(slot.title)}</div>
           <div class="slot-meta">${formatTime(slot.startMin)}–${formatTime(slot.startMin + slot.durationMin)}</div>
@@ -1791,6 +1861,29 @@
     function getSlotById(id) {
       return state.slots.find((slot) => slot.id === id);
     }
+    function rangesOverlap(startA, durationA, startB, durationB) {
+      const endA = startA + durationA;
+      const endB = startB + durationB;
+      return startA < endB && startB < endA;
+    }
+
+    function findSlotConflicts(candidate, excludeSlotId = null) {
+      return state.slots.filter((slot) => {
+        if (slot.id === excludeSlotId) return false;
+        if (slot.trainerId !== candidate.trainerId) return false;
+        if (slot.date !== candidate.date) return false;
+        return rangesOverlap(slot.startMin, slot.durationMin, candidate.startMin, candidate.durationMin);
+      });
+    }
+
+    function validateSlotConflicts(candidate, excludeSlotId = null) {
+      const conflicts = findSlotConflicts(candidate, excludeSlotId);
+      if (!conflicts.length) return true;
+      const firstConflict = conflicts[0];
+      alert(`У ${getTrainerById(candidate.trainerId).name} уже есть запись «${firstConflict.title}» на ${formatTime(firstConflict.startMin)}–${formatTime(firstConflict.startMin + firstConflict.durationMin)}. Пересечения запрещены.`);
+      return false;
+    }
+
 
     function removeSlot(id) {
       state.slots = state.slots.filter((slot) => slot.id !== id);
@@ -1926,6 +2019,7 @@
     function saveFromModal() {
       const payload = collectModalData();
       if (!payload) return;
+      if (!validateSlotConflicts(payload, modalState.mode === "edit" ? modalState.slotId : null)) return;
       let savedSlotId = modalState.slotId;
       if (modalState.mode === "edit" && modalState.slotId) {
         state.slots = state.slots.map((slot) => slot.id === modalState.slotId ? { ...slot, ...payload } : slot);
@@ -2220,8 +2314,20 @@
 
     document.addEventListener("mouseup", () => {
       if (!interaction) return;
+      const currentInteraction = interaction;
+      const slot = getSlotById(currentInteraction.slotId);
       interaction = null;
       document.body.style.cursor = "default";
+
+      if (slot && !validateSlotConflicts(slot, slot.id)) {
+        state.slots = state.slots.map((item) => item.id === currentInteraction.slotId ? {
+          ...item,
+          date: currentInteraction.originalDate,
+          startMin: currentInteraction.originalStart,
+          durationMin: currentInteraction.originalDuration
+        } : item);
+      }
+
       persistSlots();
       renderAll();
     });
