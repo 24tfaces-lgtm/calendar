@@ -1,3 +1,8 @@
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -1180,16 +1185,48 @@
       sofiya: "#db2777"
     };
 
+    const TRAINER_ALIASES = {
+      valeria: ["valeria", "valeriya", "lera", "лера", "валерия"],
+      arina: ["arina", "арина"],
+      yuliya: ["yuliya", "yulia", "yuliia", "julia", "юлия", "юля"],
+      laura: ["laura", "лаура"],
+      sofiya: ["sofiya", "sofia", "sofya", "sophia", "софия", "софья"]
+    };
+
+    const PRESET_ALIASES = {
+      training: ["training", "тренинг", "тренировка"],
+      individual: ["individual", "индивидуальная работа", "индивидуально", "индивидуалка"],
+      preparation: ["preparation", "подготовка", "подготовка к тренингу"],
+      suflirovanie: ["suflirovanie", "суфлирование"],
+      vacation: ["vacation", "отпуск", "выходной", "off"]
+    };
+
     let state = loadState();
     let interaction = null;
     let participantsViewerState = { open: false, slotId: null };
     let remoteDb = null;
     let remoteBoardRef = null;
     let remoteSlotsRef = null;
-    let remoteUnsubscribe = null;
+    let remoteUnsubscribers = [];
+    let remoteTrainerSlotsRefs = {};
     let syncEnabled = false;
     let remoteReady = false;
-    let remoteKnownSlotIds = new Set();
+    let remoteInitialLoadComplete = false;
+    let remoteNormalizationAttempted = false;
+    let remoteKnownRootSlotIds = new Set();
+    let remoteKnownTrainerSlotIds = {};
+    let remoteSourceCache = {
+      legacyDocSlots: [],
+      rootSlots: [],
+      trainerDocSlots: [],
+      trainerSubSlots: {}
+    };
+    let remoteLoadState = {
+      boardDoc: false,
+      rootSlots: false,
+      trainersCollection: false,
+      trainerSubSlots: {}
+    };
     let modalState = {
       open: false,
       mode: "new",
@@ -1434,30 +1471,461 @@
       localStorage.setItem(SLOT_STORAGE_KEY, JSON.stringify(state.slots));
     }
 
+    function normalizeLookupText(value) {
+      return String(value ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/ё/g, "е")
+        .replace(/\s+/g, " ");
+    }
+
+    function resolveAlias(value, aliasMap) {
+      const normalized = normalizeLookupText(value);
+      if (!normalized) return null;
+      for (const [canonical, aliases] of Object.entries(aliasMap)) {
+        if (canonical === normalized) return canonical;
+        if ((aliases || []).some((alias) => normalizeLookupText(alias) === normalized)) return canonical;
+      }
+      return null;
+    }
+
+    function normalizeTrainerId(slotLike) {
+      if (!slotLike) return null;
+      const candidates = [
+        slotLike.trainerId,
+        slotLike.trainer,
+        slotLike.trainerName,
+        slotLike.ownerId,
+        slotLike.owner,
+        slotLike.coachId,
+        slotLike.coach,
+        slotLike.coachName,
+        slotLike.assignee,
+        slotLike.user,
+        slotLike.userName
+      ];
+      for (const candidate of candidates) {
+        const direct = TRAINERS.find((trainer) => trainer.id === String(candidate || "").trim());
+        if (direct) return direct.id;
+        const aliased = resolveAlias(candidate, TRAINER_ALIASES);
+        if (aliased) return aliased;
+      }
+      return null;
+    }
+
+    function normalizePresetId(slotLike) {
+      if (!slotLike || typeof slotLike !== "object") return PRESETS[0].id;
+      const candidates = [
+        slotLike.presetId,
+        slotLike.preset,
+        slotLike.type,
+        slotLike.category,
+        slotLike.kind,
+        slotLike.presetTitle,
+        slotLike.activityType,
+        slotLike.activity,
+        slotLike.tag
+      ];
+      for (const candidate of candidates) {
+        const direct = PRESETS.find((preset) => preset.id === String(candidate || "").trim());
+        if (direct) return direct.id;
+        const aliased = resolveAlias(candidate, PRESET_ALIASES);
+        if (aliased) return aliased;
+        const byTitle = PRESETS.find((preset) => normalizeLookupText(preset.title) === normalizeLookupText(candidate));
+        if (byTitle) return byTitle.id;
+      }
+      const titleAlias = resolveAlias(slotLike.title || slotLike.name, PRESET_ALIASES);
+      return titleAlias || PRESETS[0].id;
+    }
+
+    function coerceDateToISO(value) {
+      if (!value) return null;
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+        if (/^\d{2}\.\d{2}\.\d{4}$/.test(trimmed)) {
+          const [day, month, year] = trimmed.split(".").map(Number);
+          return toISO(new Date(year, month - 1, day, 12));
+        }
+        const fromNative = new Date(trimmed);
+        if (!Number.isNaN(fromNative.getTime())) return toISO(fromNative);
+      }
+      if (value && typeof value.toDate === "function") {
+        const date = value.toDate();
+        if (date instanceof Date && !Number.isNaN(date.getTime())) return toISO(date);
+      }
+      if (value instanceof Date && !Number.isNaN(value.getTime())) return toISO(value);
+      return null;
+    }
+
+    function coerceRelativeMinutes(rawValue) {
+      if (rawValue === null || rawValue === undefined || rawValue === "") return null;
+      if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+        if (rawValue >= 0 && rawValue <= TOTAL_MINUTES) return rawValue;
+        if (rawValue >= START_HOUR * 60 && rawValue <= END_HOUR * 60) return rawValue - START_HOUR * 60;
+        return null;
+      }
+      const text = String(rawValue).trim();
+      if (/^\d{1,2}:\d{2}$/.test(text)) {
+        return parseTime(text) - START_HOUR * 60;
+      }
+      if (/^-?\d+(?:\.\d+)?$/.test(text)) {
+        return coerceRelativeMinutes(Number(text));
+      }
+      return null;
+    }
+
+    function extractStartMin(slot) {
+      const directCandidates = [
+        slot.startMin,
+        slot.startMinute,
+        slot.startMinutes,
+        slot.start_offset
+      ];
+      for (const candidate of directCandidates) {
+        const minutes = coerceRelativeMinutes(candidate);
+        if (minutes !== null) return minutes;
+      }
+
+      const absoluteCandidates = [
+        slot.start,
+        slot.startTime,
+        slot.timeStart,
+        slot.from,
+        slot.begin,
+        slot.time
+      ];
+      for (const candidate of absoluteCandidates) {
+        const minutes = coerceRelativeMinutes(candidate);
+        if (minutes !== null) return minutes;
+      }
+
+      const rangeCandidate = String(slot.timeRange || slot.range || "").trim();
+      if (rangeCandidate && rangeCandidate.includes("-")) {
+        const [fromPart] = rangeCandidate.split("-");
+        const minutes = coerceRelativeMinutes(fromPart.trim());
+        if (minutes !== null) return minutes;
+      }
+
+      return 0;
+    }
+
+    function extractDurationMin(slot, startMin, defaultDuration) {
+      const numericCandidates = [
+        slot.durationMin,
+        slot.duration,
+        slot.durationMinutes,
+        slot.length,
+        slot.lengthMin,
+        slot.minutes
+      ];
+      for (const candidate of numericCandidates) {
+        const numeric = Number(candidate);
+        if (Number.isFinite(numeric) && numeric > 0) return numeric;
+      }
+
+      const endCandidates = [
+        slot.endMin,
+        slot.endMinute,
+        slot.endMinutes,
+        slot.end,
+        slot.endTime,
+        slot.timeEnd,
+        slot.to
+      ];
+      for (const candidate of endCandidates) {
+        const endValue = coerceRelativeMinutes(candidate);
+        if (endValue !== null && endValue > startMin) return endValue - startMin;
+      }
+
+      const rangeCandidate = String(slot.timeRange || slot.range || "").trim();
+      if (rangeCandidate && rangeCandidate.includes("-")) {
+        const [fromPart, toPart] = rangeCandidate.split("-");
+        const startValue = coerceRelativeMinutes(fromPart.trim());
+        const endValue = coerceRelativeMinutes(toPart.trim());
+        if (startValue !== null && endValue !== null && endValue > startValue) return endValue - startValue;
+      }
+
+      return defaultDuration || 60;
+    }
+
+    function extractParticipants(slot, preset) {
+      const arrays = [
+        slot.participants,
+        slot.attendees,
+        slot.clients,
+        slot.members,
+        slot.students
+      ];
+      let source = arrays.find(Array.isArray);
+      if (!source && typeof slot.participants === "string") {
+        source = slot.participants.split(/[,;\n]/g).map((value) => value.trim()).filter(Boolean);
+      }
+      const participants = Array.isArray(source)
+        ? source.map(normalizeParticipant).filter(Boolean)
+        : [];
+      return preset.participants ? participants : [];
+    }
+
+    function buildSlotFingerprint(slot) {
+      const participantKey = (slot.participants || [])
+        .map((participant) => `${normalizeLookupText(participant.name)}:${participant.attended === true ? "1" : participant.attended === false ? "0" : "_"}`)
+        .join("|");
+      return [
+        slot.trainerId,
+        slot.date,
+        slot.startMin,
+        slot.durationMin,
+        slot.presetId,
+        normalizeLookupText(slot.title),
+        normalizeLookupText(slot.comment),
+        participantKey
+      ].join("::");
+    }
+
+    function hashString(input) {
+      let hash = 0;
+      const source = String(input || "");
+      for (let index = 0; index < source.length; index += 1) {
+        hash = (hash * 31 + source.charCodeAt(index)) >>> 0;
+      }
+      return hash.toString(16).padStart(8, "0");
+    }
+
+    function createStableSlotId(slot) {
+      return `slot-${hashString(buildSlotFingerprint(slot))}`;
+    }
+
+    function mergeSlots(primary, secondary) {
+      const primaryPreset = getPresetById(primary.presetId);
+      const secondaryPreset = getPresetById(secondary.presetId);
+      const preferredParticipants = (secondary.participants || []).length >= (primary.participants || []).length
+        ? secondary.participants
+        : primary.participants;
+      const preferredTitle = (
+        secondary.title &&
+        normalizeLookupText(secondary.title) !== normalizeLookupText(secondaryPreset.title)
+      ) ? secondary.title : (primary.title || secondary.title || primaryPreset.title);
+      return {
+        ...primary,
+        ...secondary,
+        title: preferredTitle,
+        comment: secondary.comment || primary.comment || "",
+        participants: Array.isArray(preferredParticipants) ? preferredParticipants : [],
+        id: secondary.id || primary.id || createStableSlotId({ ...primary, ...secondary })
+      };
+    }
+
+    function dedupeSlots(slots) {
+      const byId = new Map();
+      const byFingerprint = new Map();
+
+      slots.forEach((rawSlot) => {
+        if (!rawSlot) return;
+        const preparedSlot = {
+          ...rawSlot,
+          id: rawSlot.id && String(rawSlot.id).trim() ? String(rawSlot.id).trim() : null
+        };
+        const fingerprint = buildSlotFingerprint(preparedSlot);
+        const slotId = preparedSlot.id || createStableSlotId(preparedSlot);
+        preparedSlot.id = slotId;
+
+        const existingById = byId.get(slotId);
+        if (existingById) {
+          const merged = mergeSlots(existingById, preparedSlot);
+          byId.set(slotId, merged);
+          byFingerprint.set(fingerprint, merged);
+          return;
+        }
+
+        const existingByFingerprint = byFingerprint.get(fingerprint);
+        if (existingByFingerprint) {
+          const merged = mergeSlots(existingByFingerprint, preparedSlot);
+          byId.delete(existingByFingerprint.id);
+          byId.set(merged.id, merged);
+          byFingerprint.set(fingerprint, merged);
+          return;
+        }
+
+        byId.set(slotId, preparedSlot);
+        byFingerprint.set(fingerprint, preparedSlot);
+      });
+
+      return Array.from(byId.values())
+        .sort((a, b) => `${a.date}${String(a.startMin).padStart(4, "0")}${a.id}`.localeCompare(`${b.date}${String(b.startMin).padStart(4, "0")}${b.id}`));
+    }
+
+    function normalizeSlotRecord(slot) {
+      if (!slot || typeof slot !== "object") return null;
+      const trainerId = normalizeTrainerId(slot);
+      if (!trainerId) return null;
+
+      const presetId = normalizePresetId(slot);
+      const preset = getPresetById(presetId);
+      const date = coerceDateToISO(slot.date || slot.day || slot.dateISO || slot.dateIso || slot.workDate || slot.eventDate || slot.dayDate);
+      if (!date) return null;
+
+      const startMin = clamp(snapMinutes(extractStartMin(slot)), 0, TOTAL_MINUTES - SNAP);
+      const durationRaw = extractDurationMin(slot, startMin, preset.defaultDuration || 60);
+      const durationMin = clamp(snapMinutes(durationRaw), SNAP, TOTAL_MINUTES - startMin);
+
+      const titleCandidate = [
+        slot.title,
+        slot.name,
+        slot.label,
+        slot.text,
+        slot.activityName
+      ].find((value) => typeof value === "string" && value.trim());
+
+      const commentCandidate = [
+        slot.comment,
+        slot.note,
+        slot.notes,
+        slot.description,
+        slot.details
+      ].find((value) => typeof value === "string" && value.trim());
+
+      return {
+        id: typeof slot.id === "string" && slot.id.trim() ? slot.id.trim() : null,
+        trainerId,
+        date,
+        startMin,
+        durationMin,
+        presetId: preset.id,
+        title: titleCandidate ? titleCandidate.trim() : preset.title,
+        comment: commentCandidate ? commentCandidate.trim() : "",
+        participants: extractParticipants(slot, preset)
+      };
+    }
+
     function sanitizeSlots(rawSlots) {
       if (!Array.isArray(rawSlots)) return [];
-      return rawSlots
-        .filter((slot) => slot && typeof slot === "object" && slot.date && slot.trainerId)
-        .map((slot) => {
-          const preset = getPresetById(slot.presetId);
-          const startMin = clamp(snapMinutes(Number(slot.startMin) || 0), 0, TOTAL_MINUTES - SNAP);
-          const durationMin = clamp(snapMinutes(Number(slot.durationMin) || preset.defaultDuration || 60), SNAP, TOTAL_MINUTES - startMin);
-          const participants = Array.isArray(slot.participants)
-            ? slot.participants.map(normalizeParticipant).filter(Boolean)
-            : [];
-          return {
-            id: typeof slot.id === "string" ? slot.id : uid(),
-            trainerId: TRAINERS.some((trainer) => trainer.id === slot.trainerId) ? slot.trainerId : TRAINERS[0].id,
-            date: typeof slot.date === "string" ? slot.date : toISO(new Date()),
-            startMin,
-            durationMin,
-            presetId: preset.id,
-            title: typeof slot.title === "string" && slot.title.trim() ? slot.title.trim() : preset.title,
-            comment: typeof slot.comment === "string" ? slot.comment : "",
-            participants: preset.participants ? participants : []
-          };
-        })
-        .sort((a, b) => `${a.date}${String(a.startMin).padStart(4, "0")}${a.id}`.localeCompare(`${b.date}${String(b.startMin).padStart(4, "0")}${b.id}`));
+      const normalized = rawSlots
+        .map((slot) => normalizeSlotRecord(slot))
+        .filter(Boolean);
+      return dedupeSlots(normalized);
+    }
+
+    function serializeSlot(slot, includeId = false) {
+      const payload = {
+        trainerId: slot.trainerId,
+        date: slot.date,
+        startMin: slot.startMin,
+        durationMin: slot.durationMin,
+        presetId: slot.presetId,
+        title: slot.title,
+        comment: slot.comment || "",
+        participants: Array.isArray(slot.participants) ? slot.participants : []
+      };
+      return includeId ? { id: slot.id, ...payload } : payload;
+    }
+
+    function buildSlotSyncKey(slot) {
+      return `${slot.id}::${buildSlotFingerprint(slot)}`;
+    }
+
+    function sameSlotSets(leftSlots, rightSlots) {
+      const left = sanitizeSlots(leftSlots).map(buildSlotSyncKey).sort().join("|");
+      const right = sanitizeSlots(rightSlots).map(buildSlotSyncKey).sort().join("|");
+      return left === right;
+    }
+
+    function flattenRemoteTrainerSubSlots() {
+      return Object.values(remoteSourceCache.trainerSubSlots).flat();
+    }
+
+    function collectMergedRemoteSlots() {
+      return sanitizeSlots([
+        ...remoteSourceCache.legacyDocSlots,
+        ...remoteSourceCache.rootSlots,
+        ...remoteSourceCache.trainerDocSlots,
+        ...flattenRemoteTrainerSubSlots()
+      ]);
+    }
+
+    function areRemoteSourcesLoaded() {
+      return remoteLoadState.boardDoc
+        && remoteLoadState.rootSlots
+        && remoteLoadState.trainersCollection
+        && TRAINERS.every((trainer) => remoteLoadState.trainerSubSlots[trainer.id]);
+    }
+
+    function shouldNormalizeRemoteStores(mergedSlots) {
+      const trainerSubSlots = flattenRemoteTrainerSubSlots();
+      if (!sameSlotSets(remoteSourceCache.rootSlots, mergedSlots)) return true;
+      if (!sameSlotSets(remoteSourceCache.legacyDocSlots, mergedSlots)) return true;
+      if (!sameSlotSets(remoteSourceCache.trainerDocSlots, mergedSlots)) return true;
+      if (!sameSlotSets(trainerSubSlots, mergedSlots)) return true;
+      return false;
+    }
+
+    function applyRemoteMergedState() {
+      const mergedSlots = collectMergedRemoteSlots();
+
+      if (remoteInitialLoadComplete) {
+        state.slots = mergedSlots;
+        saveSlotsLocal();
+        updateSyncBadge("online", "Онлайн");
+        renderAll();
+        return;
+      }
+
+      if (!areRemoteSourcesLoaded()) {
+        if (mergedSlots.length) {
+          state.slots = mergedSlots;
+          saveSlotsLocal();
+          updateSyncBadge("online", "Онлайн");
+          renderAll();
+        }
+        return;
+      }
+
+      remoteInitialLoadComplete = true;
+      remoteReady = true;
+
+      if (mergedSlots.length) {
+        state.slots = mergedSlots;
+        saveSlotsLocal();
+      } else {
+        state.slots = sanitizeSlots(state.slots);
+        saveSlotsLocal();
+      }
+
+      updateSyncBadge("online", "Онлайн");
+      renderAll();
+
+      const needSeedRemote = !mergedSlots.length && state.slots.length;
+      const needNormalize = mergedSlots.length && shouldNormalizeRemoteStores(mergedSlots);
+
+      if (!remoteNormalizationAttempted && (needSeedRemote || needNormalize)) {
+        remoteNormalizationAttempted = true;
+        persistSlots();
+      }
+    }
+
+    function cleanupRemoteSync() {
+      remoteUnsubscribers.forEach((unsubscribe) => {
+        try { unsubscribe(); } catch (error) { console.error(error); }
+      });
+      remoteUnsubscribers = [];
+      remoteTrainerSlotsRefs = {};
+      remoteKnownRootSlotIds = new Set();
+      remoteKnownTrainerSlotIds = {};
+      remoteSourceCache = {
+        legacyDocSlots: [],
+        rootSlots: [],
+        trainerDocSlots: [],
+        trainerSubSlots: {}
+      };
+      remoteLoadState = {
+        boardDoc: false,
+        rootSlots: false,
+        trainersCollection: false,
+        trainerSubSlots: {}
+      };
+      remoteInitialLoadComplete = false;
+      remoteReady = false;
+      remoteNormalizationAttempted = false;
     }
 
     function updateSyncBadge(mode, textValue) {
@@ -1475,27 +1943,63 @@
         remoteBoardRef = remoteDb.collection("frdBoards").doc(getBoardId());
         remoteSlotsRef = remoteBoardRef.collection("slots");
         syncEnabled = true;
+        cleanupRemoteSync();
         updateSyncBadge("offline", "Подключение...");
 
-        remoteUnsubscribe = remoteSlotsRef.onSnapshot(async (snapshot) => {
-          const remoteSlots = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          remoteKnownSlotIds = new Set(snapshot.docs.map((doc) => doc.id));
-          remoteReady = true;
-
-          if (snapshot.empty && state.slots.length) {
-            await persistSlots();
-            updateSyncBadge("online", "Онлайн");
-            renderAll();
-            return;
-          }
-
-          state.slots = sanitizeSlots(remoteSlots);
-          saveSlotsLocal();
-          updateSyncBadge("online", "Онлайн");
-          renderAll();
+        remoteUnsubscribers.push(remoteBoardRef.onSnapshot((doc) => {
+          const data = doc.data() || {};
+          remoteSourceCache.legacyDocSlots = Array.isArray(data.slots) ? data.slots : [];
+          remoteLoadState.boardDoc = true;
+          applyRemoteMergedState();
         }, (error) => {
           console.error(error);
           updateSyncBadge("error", "Ошибка sync");
+        }));
+
+        remoteUnsubscribers.push(remoteSlotsRef.onSnapshot((snapshot) => {
+          remoteSourceCache.rootSlots = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          remoteKnownRootSlotIds = new Set(snapshot.docs.map((doc) => doc.id));
+          remoteLoadState.rootSlots = true;
+          applyRemoteMergedState();
+        }, (error) => {
+          console.error(error);
+          updateSyncBadge("error", "Ошибка sync");
+        }));
+
+        const trainersCollectionRef = remoteBoardRef.collection("trainers");
+        remoteUnsubscribers.push(trainersCollectionRef.onSnapshot((snapshot) => {
+          remoteSourceCache.trainerDocSlots = snapshot.docs.flatMap((doc) => {
+            const data = doc.data() || {};
+            const docTrainerId = normalizeTrainerId({ trainerId: doc.id }) || normalizeTrainerId(data);
+            const rawSlots = Array.isArray(data.slots) ? data.slots : [];
+            return rawSlots.map((slot) => ({
+              ...slot,
+              trainerId: normalizeTrainerId(slot) || docTrainerId
+            }));
+          });
+          remoteLoadState.trainersCollection = true;
+          applyRemoteMergedState();
+        }, (error) => {
+          console.error(error);
+          updateSyncBadge("error", "Ошибка sync");
+        }));
+
+        TRAINERS.forEach((trainer) => {
+          const trainerSlotsRef = trainersCollectionRef.doc(trainer.id).collection("slots");
+          remoteTrainerSlotsRefs[trainer.id] = trainerSlotsRef;
+          remoteUnsubscribers.push(trainerSlotsRef.onSnapshot((snapshot) => {
+            remoteKnownTrainerSlotIds[trainer.id] = new Set(snapshot.docs.map((doc) => doc.id));
+            remoteSourceCache.trainerSubSlots[trainer.id] = snapshot.docs.map((doc) => ({
+              id: doc.id,
+              trainerId: trainer.id,
+              ...doc.data()
+            }));
+            remoteLoadState.trainerSubSlots[trainer.id] = true;
+            applyRemoteMergedState();
+          }, (error) => {
+            console.error(error);
+            updateSyncBadge("error", "Ошибка sync");
+          }));
         });
       } catch (error) {
         console.error(error);
@@ -1506,36 +2010,68 @@
     }
 
     async function persistSlots() {
+      state.slots = sanitizeSlots(state.slots);
       saveSlotsLocal();
       if (!syncEnabled || !remoteBoardRef || !remoteSlotsRef || !remoteReady) return;
+
       try {
         const batch = remoteDb.batch();
-        const currentIds = new Set();
+        const normalizedSlots = sanitizeSlots(state.slots);
+        const rootIds = new Set();
 
         batch.set(remoteBoardRef, {
           boardId: getBoardId(),
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          version: 3
+          version: 4,
+          slots: normalizedSlots.map((slot) => serializeSlot(slot, true)),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
 
-        state.slots.forEach((slot) => {
-          currentIds.add(slot.id);
-          const { id, ...payload } = slot;
-          batch.set(remoteSlotsRef.doc(id), {
-            ...payload,
-            participants: Array.isArray(slot.participants) ? slot.participants : [],
+        normalizedSlots.forEach((slot) => {
+          rootIds.add(slot.id);
+          batch.set(remoteSlotsRef.doc(slot.id), {
+            ...serializeSlot(slot),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
         });
 
-        remoteKnownSlotIds.forEach((slotId) => {
-          if (!currentIds.has(slotId)) {
+        remoteKnownRootSlotIds.forEach((slotId) => {
+          if (!rootIds.has(slotId)) {
             batch.delete(remoteSlotsRef.doc(slotId));
           }
         });
 
+        TRAINERS.forEach((trainer) => {
+          const trainerSlots = normalizedSlots.filter((slot) => slot.trainerId === trainer.id);
+          const trainerDocRef = remoteBoardRef.collection("trainers").doc(trainer.id);
+          const trainerSubRef = trainerDocRef.collection("slots");
+          const trainerIds = new Set();
+
+          batch.set(trainerDocRef, {
+            trainerId: trainer.id,
+            name: trainer.name,
+            slots: trainerSlots.map((slot) => serializeSlot(slot, true)),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+
+          trainerSlots.forEach((slot) => {
+            trainerIds.add(slot.id);
+            batch.set(trainerSubRef.doc(slot.id), {
+              ...serializeSlot(slot),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+          });
+
+          (remoteKnownTrainerSlotIds[trainer.id] || new Set()).forEach((slotId) => {
+            if (!trainerIds.has(slotId)) {
+              batch.delete(trainerSubRef.doc(slotId));
+            }
+          });
+
+          remoteKnownTrainerSlotIds[trainer.id] = trainerIds;
+        });
+
         await batch.commit();
-        remoteKnownSlotIds = currentIds;
+        remoteKnownRootSlotIds = rootIds;
         updateSyncBadge("online", "Онлайн");
       } catch (error) {
         console.error(error);
