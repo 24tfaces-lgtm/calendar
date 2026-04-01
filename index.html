@@ -1213,6 +1213,8 @@
     let remoteReady = false;
     let remoteInitialLoadComplete = false;
     let remoteNormalizationAttempted = false;
+    let remoteLegacyImportDone = false;
+    let remoteLegacyImportInFlight = false;
     let remoteKnownRootSlotIds = new Set();
     let remoteKnownTrainerSlotIds = {};
     let remoteSourceCache = {
@@ -1409,10 +1411,37 @@
       participantsViewerList.innerHTML = "";
     }
 
+    const DEFAULT_BOARD_ID = "main-v1";
+    const BOARD_FAMILIES = {
+      main: ["main", "main-v1", "team-frd"],
+      "main-v1": ["main-v1", "main", "team-frd"],
+      "team-frd": ["team-frd", "main-v1", "main"]
+    };
+
+    function sanitizeBoardId(raw, fallback = DEFAULT_BOARD_ID) {
+      const normalized = String(raw || "").trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+      return normalized || fallback;
+    }
+
     function getBoardId() {
       const params = new URLSearchParams(window.location.search);
-      const raw = params.get("board") || "main";
-      return raw.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-") || "main";
+      return sanitizeBoardId(params.get("board") || DEFAULT_BOARD_ID);
+    }
+
+    function getBoardFamilyIds(boardId = getBoardId()) {
+      const family = BOARD_FAMILIES[boardId];
+      if (!Array.isArray(family) || !family.length) return [boardId];
+      return Array.from(new Set([boardId, ...family.map((item) => sanitizeBoardId(item, boardId))]));
+    }
+
+    function getLegacyBoardIds(boardId = getBoardId()) {
+      return getBoardFamilyIds(boardId).filter((id) => id !== boardId);
+    }
+
+    function getBoardBadgeText() {
+      const family = getBoardFamilyIds();
+      if (family.length <= 1) return `Доска: ${family[0]}`;
+      return `Доски: ${family.join(", ")}`;
     }
 
     function getFallbackUiState() {
@@ -1716,9 +1745,24 @@
       };
     }
 
+    function buildExactRangeKey(slot) {
+      return [slot.trainerId, slot.date, slot.startMin, slot.durationMin].join("::");
+    }
+
+    function getSlotDetailScore(slot) {
+      const preset = getPresetById(slot.presetId);
+      let score = 0;
+      if (slot.title && normalizeLookupText(slot.title) !== normalizeLookupText(preset.title)) score += 3;
+      if (slot.comment) score += 2;
+      if (Array.isArray(slot.participants)) score += slot.participants.length;
+      if (slot.id && !String(slot.id).startsWith("slot-")) score += 1;
+      return score;
+    }
+
     function dedupeSlots(slots) {
       const byId = new Map();
       const byFingerprint = new Map();
+      const byExactRange = new Map();
 
       slots.forEach((rawSlot) => {
         if (!rawSlot) return;
@@ -1734,7 +1778,8 @@
         if (existingById) {
           const merged = mergeSlots(existingById, preparedSlot);
           byId.set(slotId, merged);
-          byFingerprint.set(fingerprint, merged);
+          byFingerprint.set(buildSlotFingerprint(merged), merged);
+          byExactRange.set(buildExactRangeKey(merged), merged);
           return;
         }
 
@@ -1743,12 +1788,27 @@
           const merged = mergeSlots(existingByFingerprint, preparedSlot);
           byId.delete(existingByFingerprint.id);
           byId.set(merged.id, merged);
-          byFingerprint.set(fingerprint, merged);
+          byFingerprint.set(buildSlotFingerprint(merged), merged);
+          byExactRange.set(buildExactRangeKey(merged), merged);
+          return;
+        }
+
+        const exactRangeKey = buildExactRangeKey(preparedSlot);
+        const existingByRange = byExactRange.get(exactRangeKey);
+        if (existingByRange) {
+          const primary = getSlotDetailScore(existingByRange) >= getSlotDetailScore(preparedSlot) ? existingByRange : preparedSlot;
+          const secondary = primary === existingByRange ? preparedSlot : existingByRange;
+          const merged = mergeSlots(primary, secondary);
+          byId.delete(existingByRange.id);
+          byId.set(merged.id, merged);
+          byFingerprint.set(buildSlotFingerprint(merged), merged);
+          byExactRange.set(exactRangeKey, merged);
           return;
         }
 
         byId.set(slotId, preparedSlot);
         byFingerprint.set(fingerprint, preparedSlot);
+        byExactRange.set(exactRangeKey, preparedSlot);
       });
 
       return Array.from(byId.values())
@@ -1894,6 +1954,10 @@
       updateSyncBadge("online", "Онлайн");
       renderAll();
 
+      if (!remoteLegacyImportDone && !remoteLegacyImportInFlight) {
+        importLegacyBoardDataIntoPrimary();
+      }
+
       const needSeedRemote = !mergedSlots.length && state.slots.length;
       const needNormalize = mergedSlots.length && shouldNormalizeRemoteStores(mergedSlots);
 
@@ -1926,12 +1990,84 @@
       remoteInitialLoadComplete = false;
       remoteReady = false;
       remoteNormalizationAttempted = false;
+      remoteLegacyImportDone = false;
+      remoteLegacyImportInFlight = false;
+    }
+
+    async function fetchBoardSlots(boardId) {
+      const boardRef = remoteDb.collection("frdBoards").doc(boardId);
+      const trainersCollectionRef = boardRef.collection("trainers");
+      const [boardDoc, rootSlotsSnap, trainerDocsSnap] = await Promise.all([
+        boardRef.get(),
+        boardRef.collection("slots").get(),
+        trainersCollectionRef.get()
+      ]);
+
+      const trainerDocSlots = trainerDocsSnap.docs.flatMap((doc) => {
+        const data = doc.data() || {};
+        const docTrainerId = normalizeTrainerId({ trainerId: doc.id }) || normalizeTrainerId(data);
+        const rawSlots = Array.isArray(data.slots) ? data.slots : [];
+        return rawSlots.map((slot) => ({ ...slot, trainerId: normalizeTrainerId(slot) || docTrainerId }));
+      });
+
+      const trainerSubSnaps = await Promise.all(
+        trainerDocsSnap.docs.map((doc) => doc.ref.collection("slots").get())
+      );
+
+      const trainerSubSlots = trainerSubSnaps.flatMap((snapshot, index) => {
+        const trainerDoc = trainerDocsSnap.docs[index];
+        const docTrainerId = normalizeTrainerId({ trainerId: trainerDoc.id }) || normalizeTrainerId(trainerDoc.data() || {});
+        return snapshot.docs.map((doc) => ({ id: doc.id, trainerId: docTrainerId, ...doc.data() }));
+      });
+
+      const boardData = boardDoc.data() || {};
+      const legacyDocSlots = Array.isArray(boardData.slots) ? boardData.slots : [];
+      const rootSlots = rootSlotsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+      return sanitizeSlots([
+        ...legacyDocSlots,
+        ...rootSlots,
+        ...trainerDocSlots,
+        ...trainerSubSlots
+      ]);
+    }
+
+    async function importLegacyBoardDataIntoPrimary() {
+      if (!syncEnabled || !remoteDb || remoteLegacyImportDone || remoteLegacyImportInFlight) return;
+      const legacyBoardIds = getLegacyBoardIds();
+      if (!legacyBoardIds.length) {
+        remoteLegacyImportDone = true;
+        return;
+      }
+
+      remoteLegacyImportInFlight = true;
+      try {
+        const importedLists = await Promise.all(legacyBoardIds.map((boardId) => fetchBoardSlots(boardId).catch((error) => {
+          console.error(error);
+          return [];
+        })));
+        const importedSlots = sanitizeSlots(importedLists.flat());
+        remoteLegacyImportDone = true;
+        if (!importedSlots.length) return;
+
+        const merged = sanitizeSlots([...state.slots, ...importedSlots]);
+        if (sameSlotSets(merged, state.slots)) return;
+
+        state.slots = merged;
+        saveSlotsLocal();
+        renderAll();
+        if (remoteReady) {
+          await persistSlots();
+        }
+      } finally {
+        remoteLegacyImportInFlight = false;
+      }
     }
 
     function updateSyncBadge(mode, textValue) {
       syncStatus.textContent = textValue;
       syncStatus.className = `meta-pill ${mode}`;
-      boardBadge.textContent = `Доска: ${getBoardId()}`;
+      boardBadge.textContent = getBoardBadgeText();
     }
 
     async function initRemoteSync() {
