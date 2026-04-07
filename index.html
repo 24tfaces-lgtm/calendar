@@ -3,6 +3,8 @@
 
 
 
+
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -1227,7 +1229,7 @@
       valeria: ["valeria", "valeriya", "lera", "лера", "валерия"],
       arina: ["arina", "арина"],
       yuliya: ["yuliya", "yulia", "yuliia", "julia", "юлия", "юля"],
-      laura: ["laura", "лаура"],
+      laura: ["laura", "laurah", "lora", "лара", "лаура"],
       sofiya: ["sofiya", "sofia", "sofya", "sophia", "софия", "софья"]
     };
 
@@ -1573,16 +1575,25 @@
         slotLike.trainerName,
         slotLike.ownerId,
         slotLike.owner,
+        slotLike.ownerName,
         slotLike.coachId,
         slotLike.coach,
         slotLike.coachName,
         slotLike.assignee,
+        slotLike.assigneeName,
         slotLike.user,
-        slotLike.userName
+        slotLike.userName,
+        slotLike.name,
+        slotLike.fullName,
+        slotLike.displayName,
+        slotLike.trainerDisplayName,
+        slotLike.employeeName
       ];
       for (const candidate of candidates) {
-        const direct = TRAINERS.find((trainer) => trainer.id === String(candidate || "").trim());
+        const direct = TRAINERS.find((trainer) => normalizeLookupText(trainer.id) === normalizeLookupText(candidate));
         if (direct) return direct.id;
+        const byName = TRAINERS.find((trainer) => normalizeLookupText(trainer.name) === normalizeLookupText(candidate));
+        if (byName) return byName.id;
         const aliased = resolveAlias(candidate, TRAINER_ALIASES);
         if (aliased) return aliased;
       }
@@ -2012,9 +2023,19 @@
 
     function sanitizeSlots(rawSlots) {
       if (!Array.isArray(rawSlots)) return [];
+      const dropped = [];
       const normalized = rawSlots
-        .map((slot) => normalizeSlotRecord(slot))
+        .map((slot) => {
+          const normalizedSlot = normalizeSlotRecord(slot);
+          if (!normalizedSlot) dropped.push(slot);
+          return normalizedSlot;
+        })
         .filter(Boolean);
+
+      if (dropped.length) {
+        console.warn("FRD: пропущены слоты с неопределенным тренером или датой", dropped.slice(0, 10));
+      }
+
       return normalizeResolvedSlots(normalized);
     }
 
